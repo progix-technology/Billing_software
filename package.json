@@ -1,0 +1,34 @@
+{
+  "name": "billing-software",
+  "version": "1.0.0",
+  "description": "Billing Software Desktop App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.billingsoftware.app",
+    "productName": "Billing Software",
+    "win": {
+      "target": "nsis"
+    },
+    "files": [
+      "main.js",
+      "backend/**/*",
+      "backend/.env",
+      "frontend/dist/**/*"
+    ],
+    "directories": {
+      "buildResources": "assets",
+      "output": "dist"
+    }
+  }
+}

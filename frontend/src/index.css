@@ -1,0 +1,132 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    font-family: 'Inter', sans-serif;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    font-family: 'Outfit', sans-serif;
+  }
+}
+
+/* Premium Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+.dark ::-webkit-scrollbar-thumb {
+  background: #475569;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Glassmorphism utility */
+.glass {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.dark .glass {
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Custom fade keyframe */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.4s ease forwards;
+}
+
+/* Custom animations for Splash Screen */
+@keyframes bounceSlow {
+  0%, 100% { transform: translateY(-5%); }
+  50% { transform: translateY(0); }
+}
+@keyframes spinSlow {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+@keyframes progressAnim {
+  0% { left: -100%; width: 50%; }
+  50% { left: 50%; width: 75%; }
+  100% { left: 100%; width: 50%; }
+}
+
+.animate-bounce-slow {
+  animation: bounceSlow 3s infinite ease-in-out;
+}
+.animate-spin-slow {
+  animation: spinSlow 8s infinite linear;
+}
+.animate-progress {
+  animation: progressAnim 1.8s infinite ease-in-out;
+}
+
+/* Premium component separation outline overrides */
+.border-slate-100 {
+  border-color: #cbd5e1 !important; /* slate-300 */
+}
+.border-slate-200 {
+  border-color: #cbd5e1 !important; /* slate-300: clean gray outline */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.01), 0 2px 4px -2px rgba(0, 0, 0, 0.01) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.border-cream-200 {
+  border-color: #cbd5e1 !important; /* slate-300 */
+}
+.dark .border-slate-800 {
+  border-color: #334155 !important; /* slate-700 */
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1) !important;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
+.dark .border-slate-700 {
+  border-color: #334155 !important;
+}
+
+/* Premium Card Hover Lift & Glow Effects */
+.bg-white.border-slate-200 {
+  will-change: transform, box-shadow, border-color;
+}
+
+.bg-white.border-slate-200:hover {
+  transform: translateY(-3px) !important;
+  border-color: #0ea5e9 !important; /* Sky-500 glow border */
+  box-shadow: 0 16px 24px -4px rgba(14, 165, 233, 0.08), 0 6px 12px -4px rgba(14, 165, 233, 0.04) !important;
+}
+
+.dark .bg-slate-900.border-slate-800:hover {
+  transform: translateY(-3px) !important;
+  border-color: #38bdf8 !important; /* Light sky blue glow */
+  box-shadow: 0 16px 24px -4px rgba(56, 189, 248, 0.12), 0 6px 12px -4px rgba(56, 189, 248, 0.06) !important;
+}
+
+/* Table Row interactive highlights */
+tbody tr {
+  transition: background-color 0.15s ease !important;
+}
+tbody tr:hover {
+  background-color: rgba(14, 165, 233, 0.015) !important;
+}
+.dark tbody tr:hover {
+  background-color: rgba(56, 189, 248, 0.02) !important;
+}
+
+
+
