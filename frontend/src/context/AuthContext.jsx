@@ -3,9 +3,15 @@ import axios from 'axios';
 
 const AuthContext = createContext();
 
+// Determine default base URL based on environment
+let defaultBaseURL = '';
+if (window.location.protocol === 'file:') {
+  defaultBaseURL = 'http://localhost:5000'; // Electron local backend
+}
+
 // Create configure axios instance
 export const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '', // Empty uses Vite Proxy locally, VITE_API_URL uses Render in prod
+  baseURL: import.meta.env.VITE_API_URL || defaultBaseURL,
 });
 
 export const AuthProvider = ({ children }) => {
