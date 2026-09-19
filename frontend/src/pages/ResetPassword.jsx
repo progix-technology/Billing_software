@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
-import { Lock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Lock, Eye, EyeOff, AlertCircle, CheckCircle } from 'lucide-react';
 import { api } from '../context/AuthContext';
+import bgImg from '../assets/splash_screen_bg.png';
 
 const ResetPassword = () => {
   const { token } = useParams();
@@ -9,6 +10,7 @@ const ResetPassword = () => {
 
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
@@ -18,12 +20,15 @@ const ResetPassword = () => {
     if (password !== confirmPassword) {
       return setError('Passwords do not match');
     }
+    if (password.length < 6) {
+      return setError('Password must be at least 6 characters');
+    }
 
     setLoading(true);
     setError('');
 
     try {
-      const res = await api.post(`/api/auth/reset-password/${token}`, { password });
+      const res = await api.put(`/api/auth/reset-password/${token}`, { password });
       if (res.data.success) {
         setSuccess(true);
         setTimeout(() => {
@@ -39,9 +44,9 @@ const ResetPassword = () => {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden bg-slate-50"
       style={{
-        backgroundImage: `url('/splash_screen_bg.png')`,
+        backgroundImage: `url(${bgImg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}

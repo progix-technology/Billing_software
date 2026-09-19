@@ -16,6 +16,7 @@ import {
   X,
   LogOut
 } from 'lucide-react';
+import logoImg from '../../assets/progix_logo.png';
 
 const Sidebar = ({ isOpen, setIsOpen }) => {
   const { user, logout } = useAuth();
@@ -83,7 +84,7 @@ const Sidebar = ({ isOpen, setIsOpen }) => {
         <div className="h-16 flex items-center justify-between px-4 border-b border-slate-200 flex-shrink-0">
           <div className="flex items-center gap-2.5 overflow-hidden">
             <div className="h-8 w-8 aspect-square rounded overflow-hidden flex items-center justify-center flex-shrink-0">
-              <img src="/progix_logo.png" alt="Logo" className="h-full w-full object-contain" />
+              <img src={logoImg} alt="Logo" className="h-full w-full object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="text-base font-bold tracking-tight text-blue-600 leading-tight truncate">Billing Software</span>

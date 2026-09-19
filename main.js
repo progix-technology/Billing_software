@@ -4,12 +4,22 @@ const { spawn } = require('child_process');
 
 let mainWindow;
 
+process.on('uncaughtException', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.log('Port 5000 is already active, continuing with running instance.');
+  } else {
+    console.error('Uncaught Exception:', err);
+  }
+});
+
 function startBackend() {
   try {
     // Require the server directly instead of spawning a new node process
     require('./backend/server.js');
   } catch (err) {
-    dialog.showErrorBox('Backend Error', err.message + '\n' + err.stack);
+    if (err.code !== 'EADDRINUSE') {
+      dialog.showErrorBox('Backend Error', err.message + '\n' + err.stack);
+    }
   }
 }
 

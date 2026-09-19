@@ -1,13 +1,14 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Phone, Mail, ArrowLeft, ShieldCheck, Headphones } from 'lucide-react';
+import bgImg from '../assets/splash_screen_bg.png';
 
 const ForgotPassword = () => {
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden select-none"
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden select-none bg-slate-50"
       style={{
-        backgroundImage: `url('/splash_screen_bg.png')`,
+        backgroundImage: `url(${bgImg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}

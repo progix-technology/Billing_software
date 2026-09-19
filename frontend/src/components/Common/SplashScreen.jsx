@@ -1,12 +1,15 @@
 import React from 'react';
+import logoImg from '../../assets/progix_logo.png';
+import bgImg from '../../assets/splash_screen_bg.png';
 
 const SplashScreen = ({ fadeOut }) => {
   return (
     <div
-      className={`fixed inset-0 z-[100] flex flex-col transition-opacity duration-500 ease-in-out select-none ${fadeOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        }`}
+      className={`fixed inset-0 z-[100] flex flex-col bg-slate-50 transition-opacity duration-500 ease-in-out select-none ${
+        fadeOut ? 'opacity-0 pointer-events-none' : 'opacity-100'
+      }`}
       style={{
-        backgroundImage: `url('/splash_screen_bg.png')`,
+        backgroundImage: `url(${bgImg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
@@ -54,7 +57,7 @@ const SplashScreen = ({ fadeOut }) => {
       <div className="flex flex-col items-center justify-center flex-1 space-y-4">
         {/* Logo with Larger Square Shape Badge Background */}
         <div className="h-28 w-28 sm:h-32 sm:w-32 aspect-square bg-white rounded-3xl shadow-2xl border border-slate-100/90 flex items-center justify-center p-4 animate-bounce-slow">
-          <img src="/progix_logo.png" alt="ProBilling Logo" className="h-full w-full object-contain" />
+          <img src={logoImg} alt="ProBilling Logo" className="h-full w-full object-contain" />
         </div>
 
         {/* Brand name */}

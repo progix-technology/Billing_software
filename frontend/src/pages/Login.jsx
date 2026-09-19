@@ -4,6 +4,8 @@ import { useAuth } from '../context/AuthContext';
 import { Mail, Lock, Eye, EyeOff, AlertCircle, ShieldAlert } from 'lucide-react';
 import { api } from '../context/AuthContext';
 import MaintenancePage from './MaintenancePage';
+import logoImg from '../assets/progix_logo.png';
+import bgImg from '../assets/splash_screen_bg.png';
 
 const Login = () => {
   const { login } = useAuth();
@@ -73,9 +75,9 @@ const Login = () => {
 
   return (
     <div
-      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden select-none"
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden select-none bg-slate-50"
       style={{
-        backgroundImage: `url('/splash_screen_bg.png')`,
+        backgroundImage: `url(${bgImg})`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
       }}
@@ -123,7 +125,7 @@ const Login = () => {
         <div className="flex flex-col items-center mb-6">
           {/* Square Logo Badge */}
           <div className="h-16 w-16 aspect-square bg-white rounded-2xl shadow-md border border-slate-100 flex items-center justify-center p-2.5 mb-3">
-            <img src="/progix_logo.png" alt="ProBilling Logo" className="w-full h-full object-contain" />
+            <img src={logoImg} alt="ProBilling Logo" className="w-full h-full object-contain" />
           </div>
 
           {/* Brand Name */}
