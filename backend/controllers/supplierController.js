@@ -8,7 +8,7 @@ const InventoryLog = require('../models/InventoryLog');
 exports.getSuppliers = async (req, res, next) => {
   try {
     const { search, page = 1, limit = 50 } = req.query;
-    const query = {};
+    const query = { tenantId: req.user.tenantId };
 
     if (search) {
       query.$or = [
@@ -47,7 +47,7 @@ exports.getSuppliers = async (req, res, next) => {
 // @access  Private
 exports.getSupplier = async (req, res, next) => {
   try {
-    const supplier = await Supplier.findById(req.params.id);
+    const supplier = await Supplier.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
     if (!supplier) {
       return res.status(404).json({ success: false, message: 'Supplier not found' });
     }
@@ -64,12 +64,13 @@ exports.createSupplier = async (req, res, next) => {
   try {
     const { name, contactPerson, phone, email, gstNumber, address, outstandingBalance } = req.body;
 
-    const phoneExists = await Supplier.findOne({ phone: phone.trim() });
+    const phoneExists = await Supplier.findOne({ phone: phone.trim(), tenantId: req.user.tenantId });
     if (phoneExists) {
       return res.status(400).json({ success: false, message: 'Supplier with this phone number already exists' });
     }
 
     const supplier = await Supplier.create({
+      tenantId: req.user.tenantId,
       name,
       contactPerson,
       phone: phone.trim(),
@@ -90,22 +91,23 @@ exports.createSupplier = async (req, res, next) => {
 // @access  Private (Admin or Manager)
 exports.updateSupplier = async (req, res, next) => {
   try {
-    let supplier = await Supplier.findById(req.params.id);
+    let supplier = await Supplier.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
     if (!supplier) {
       return res.status(404).json({ success: false, message: 'Supplier not found' });
     }
 
     if (req.body.phone && req.body.phone !== supplier.phone) {
-      const phoneExists = await Supplier.findOne({ phone: req.body.phone });
+      const phoneExists = await Supplier.findOne({ phone: req.body.phone, tenantId: req.user.tenantId });
       if (phoneExists) {
         return res.status(400).json({ success: false, message: 'Phone number already in use' });
       }
     }
 
-    supplier = await Supplier.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    supplier = await Supplier.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.user.tenantId },
+      req.body, 
+      { new: true, runValidators: true }
+    );
 
     res.status(200).json({ success: true, supplier });
   } catch (error) {
@@ -118,7 +120,7 @@ exports.updateSupplier = async (req, res, next) => {
 // @access  Private (Admin or Manager)
 exports.deleteSupplier = async (req, res, next) => {
   try {
-    const supplier = await Supplier.findById(req.params.id);
+    const supplier = await Supplier.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
     if (!supplier) {
       return res.status(404).json({ success: false, message: 'Supplier not found' });
     }
@@ -136,17 +138,18 @@ exports.deleteSupplier = async (req, res, next) => {
 exports.getSupplierLedger = async (req, res, next) => {
   try {
     const supplierId = req.params.id;
-    const supplier = await Supplier.findById(supplierId);
+    const supplier = await Supplier.findOne({ _id: supplierId, tenantId: req.user.tenantId });
     if (!supplier) {
       return res.status(404).json({ success: false, message: 'Supplier not found' });
     }
 
     // We can pull payments
-    const payments = await Payment.find({ supplier: supplierId }).sort({ createdAt: 1 });
+    const payments = await Payment.find({ supplier: supplierId, tenantId: req.user.tenantId }).sort({ createdAt: 1 });
 
     // We can fetch inventory logs that correspond to supplier purchases (stock inward)
     // For simplicity, let's look for InventoryLogs where type = 'IN' and remarks contain 'Supplier' or referenceId is purchase
     const purchases = await InventoryLog.find({
+      tenantId: req.user.tenantId,
       type: 'IN',
       remarks: { $regex: 'Supplier', $options: 'i' },
     }).populate('product').sort({ createdAt: 1 });

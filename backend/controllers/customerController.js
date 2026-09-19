@@ -8,7 +8,7 @@ const Payment = require('../models/Payment');
 exports.getCustomers = async (req, res, next) => {
   try {
     const { search, page = 1, limit = 50 } = req.query;
-    const query = {};
+    const query = { tenantId: req.user.tenantId };
 
     if (search) {
       query.$or = [
@@ -46,7 +46,7 @@ exports.getCustomers = async (req, res, next) => {
 // @access  Private
 exports.getCustomer = async (req, res, next) => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
@@ -63,12 +63,13 @@ exports.createCustomer = async (req, res, next) => {
   try {
     const { name, phone, email, gstNumber, address, notes, outstandingBalance } = req.body;
 
-    const phoneExists = await Customer.findOne({ phone: phone.trim() });
+    const phoneExists = await Customer.findOne({ phone: phone.trim(), tenantId: req.user.tenantId });
     if (phoneExists) {
       return res.status(400).json({ success: false, message: 'Customer with this phone number already exists' });
     }
 
     const customer = await Customer.create({
+      tenantId: req.user.tenantId,
       name,
       phone: phone.trim(),
       email,
@@ -89,22 +90,23 @@ exports.createCustomer = async (req, res, next) => {
 // @access  Private
 exports.updateCustomer = async (req, res, next) => {
   try {
-    let customer = await Customer.findById(req.params.id);
+    let customer = await Customer.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
 
     if (req.body.phone && req.body.phone !== customer.phone) {
-      const phoneExists = await Customer.findOne({ phone: req.body.phone });
+      const phoneExists = await Customer.findOne({ phone: req.body.phone, tenantId: req.user.tenantId });
       if (phoneExists) {
         return res.status(400).json({ success: false, message: 'Phone number already in use' });
       }
     }
 
-    customer = await Customer.findByIdAndUpdate(req.params.id, req.body, {
-      new: true,
-      runValidators: true,
-    });
+    customer = await Customer.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.user.tenantId },
+      req.body, 
+      { new: true, runValidators: true }
+    );
 
     res.status(200).json({ success: true, customer });
   } catch (error) {
@@ -117,7 +119,7 @@ exports.updateCustomer = async (req, res, next) => {
 // @access  Private (Admin only)
 exports.deleteCustomer = async (req, res, next) => {
   try {
-    const customer = await Customer.findById(req.params.id);
+    const customer = await Customer.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
@@ -135,15 +137,15 @@ exports.deleteCustomer = async (req, res, next) => {
 exports.getCustomerLedger = async (req, res, next) => {
   try {
     const customerId = req.params.id;
-    const customer = await Customer.findById(customerId);
+    const customer = await Customer.findOne({ _id: customerId, tenantId: req.user.tenantId });
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
 
     // Fetch invoices
-    const invoices = await Invoice.find({ customer: customerId }).sort({ createdAt: 1 });
+    const invoices = await Invoice.find({ customer: customerId, tenantId: req.user.tenantId }).sort({ createdAt: 1 });
     // Fetch payments
-    const payments = await Payment.find({ customer: customerId }).sort({ createdAt: 1 });
+    const payments = await Payment.find({ customer: customerId, tenantId: req.user.tenantId }).sort({ createdAt: 1 });
 
     // Combine and sort ledger entries
     const ledger = [];

@@ -30,9 +30,7 @@ function createWindow() {
   // Load the React build file
   mainWindow.loadFile(path.join(__dirname, 'frontend', 'dist', 'index.html'));
 
-  // Open the DevTools to help with debugging
-  mainWindow.webContents.openDevTools();
-
+  // DevTools hidden in production
   mainWindow.on('closed', function () {
     mainWindow = null;
   });
@@ -48,8 +46,3 @@ app.on('window-all-closed', function () {
   if (process.platform !== 'darwin') app.quit();
 });
 
-app.on('will-quit', () => {
-  if (backendProcess) {
-    backendProcess.kill();
-  }
-});

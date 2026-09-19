@@ -15,14 +15,14 @@ const StoreSetting = require('../models/StoreSetting');
 // @access  Private (Admin only)
 exports.backupDatabase = async (req, res, next) => {
   try {
-    const categories = await Category.find();
-    const products = await Product.find();
-    const customers = await Customer.find();
-    const suppliers = await Supplier.find();
-    const invoices = await Invoice.find();
-    const payments = await Payment.find();
-    const inventoryLogs = await InventoryLog.find();
-    const users = await User.find().select('+password');
+    const categories = await Category.find({ tenantId: req.user.tenantId });
+    const products = await Product.find({ tenantId: req.user.tenantId });
+    const customers = await Customer.find({ tenantId: req.user.tenantId });
+    const suppliers = await Supplier.find({ tenantId: req.user.tenantId });
+    const invoices = await Invoice.find({ tenantId: req.user.tenantId });
+    const payments = await Payment.find({ tenantId: req.user.tenantId });
+    const inventoryLogs = await InventoryLog.find({ tenantId: req.user.tenantId });
+    const users = await User.find({ tenantId: req.user.tenantId }).select('+password');
 
     const backupData = {
       timestamp: new Date().toISOString(),
@@ -58,38 +58,38 @@ exports.restoreDatabase = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invalid backup file payload' });
     }
 
-    // Clear existing
+    // Clear existing for this tenant
     if (data.categories) {
-      await Category.deleteMany({});
-      await Category.insertMany(data.categories);
+      await Category.deleteMany({ tenantId: req.user.tenantId });
+      await Category.insertMany(data.categories.map(d => ({ ...d, tenantId: req.user.tenantId })));
     }
     if (data.products) {
-      await Product.deleteMany({});
-      await Product.insertMany(data.products);
+      await Product.deleteMany({ tenantId: req.user.tenantId });
+      await Product.insertMany(data.products.map(d => ({ ...d, tenantId: req.user.tenantId })));
     }
     if (data.customers) {
-      await Customer.deleteMany({});
-      await Customer.insertMany(data.customers);
+      await Customer.deleteMany({ tenantId: req.user.tenantId });
+      await Customer.insertMany(data.customers.map(d => ({ ...d, tenantId: req.user.tenantId })));
     }
     if (data.suppliers) {
-      await Supplier.deleteMany({});
-      await Supplier.insertMany(data.suppliers);
+      await Supplier.deleteMany({ tenantId: req.user.tenantId });
+      await Supplier.insertMany(data.suppliers.map(d => ({ ...d, tenantId: req.user.tenantId })));
     }
     if (data.invoices) {
-      await Invoice.deleteMany({});
-      await Invoice.insertMany(data.invoices);
+      await Invoice.deleteMany({ tenantId: req.user.tenantId });
+      await Invoice.insertMany(data.invoices.map(d => ({ ...d, tenantId: req.user.tenantId })));
     }
     if (data.payments) {
-      await Payment.deleteMany({});
-      await Payment.insertMany(data.payments);
+      await Payment.deleteMany({ tenantId: req.user.tenantId });
+      await Payment.insertMany(data.payments.map(d => ({ ...d, tenantId: req.user.tenantId })));
     }
     if (data.inventoryLogs) {
-      await InventoryLog.deleteMany({});
-      await InventoryLog.insertMany(data.inventoryLogs);
+      await InventoryLog.deleteMany({ tenantId: req.user.tenantId });
+      await InventoryLog.insertMany(data.inventoryLogs.map(d => ({ ...d, tenantId: req.user.tenantId })));
     }
     if (data.users) {
-      await User.deleteMany({});
-      await User.insertMany(data.users);
+      // Don't let tenant restore users, it's unsafe in SaaS. 
+      // Superadmin handles user creation now.
     }
 
     // Log this operation
@@ -111,10 +111,10 @@ exports.restoreDatabase = async (req, res, next) => {
 // @access  Private
 exports.getStoreSettings = async (req, res, next) => {
   try {
-    let settings = await StoreSetting.findOne();
+    let settings = await StoreSetting.findOne({ tenantId: req.user.tenantId });
     if (!settings) {
       // Create default settings if not exists
-      settings = await StoreSetting.create({});
+      settings = await StoreSetting.create({ tenantId: req.user.tenantId });
     }
     res.status(200).json({ success: true, settings });
   } catch (error) {
@@ -129,9 +129,9 @@ exports.saveStoreSettings = async (req, res, next) => {
   try {
     const { storeName, storeGst, storeAddress, storePhone, dashboardBanner, gstSlabs } = req.body;
 
-    let settings = await StoreSetting.findOne();
+    let settings = await StoreSetting.findOne({ tenantId: req.user.tenantId });
     if (!settings) {
-      settings = new StoreSetting({});
+      settings = new StoreSetting({ tenantId: req.user.tenantId });
     }
 
     if (storeName !== undefined) settings.storeName = storeName;
@@ -145,6 +145,7 @@ exports.saveStoreSettings = async (req, res, next) => {
 
     // Log this operation
     await ActivityLog.create({
+      tenantId: req.user.tenantId,
       user: req.user.id,
       action: 'UPDATE_SETTINGS',
       module: 'SETTINGS',

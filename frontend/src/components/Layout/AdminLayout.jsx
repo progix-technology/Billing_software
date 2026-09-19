@@ -26,7 +26,7 @@ const AdminLayout = () => {
   }
 
   return (
-    <div className="min-h-screen bg-cream-100 text-slate-800 transition-colors duration-300">
+    <div className="min-h-screen bg-slate-50 text-slate-800 transition-colors duration-300">
       {/* Sidebar Panel */}
       <Sidebar 
         isOpen={isMobileSidebarOpen} 
@@ -34,7 +34,7 @@ const AdminLayout = () => {
       />
 
       {/* Main Panel */}
-      <div className="lg:pl-64 pl-0 flex flex-col min-h-screen transition-all duration-300">
+      <div className="lg:pl-60 pl-0 flex flex-col min-h-screen transition-all duration-300">
         {/* Topbar Header */}
         <Header 
           toggleSidebar={() => setIsMobileSidebarOpen(!isMobileSidebarOpen)} 

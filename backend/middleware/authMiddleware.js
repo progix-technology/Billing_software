@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const mongoose = require('mongoose');
+const SystemSetting = require('../models/SystemSetting');
 
 // Protect Routes (JWT Validation)
 const protect = async (req, res, next) => {
@@ -18,8 +19,21 @@ const protect = async (req, res, next) => {
         id: decoded.id,
         role: decoded.role,
         username: decoded.username,
-        email: decoded.email
+        email: decoded.email,
+        tenantId: decoded.tenantId // Inject tenantId for multi-tenancy
       };
+
+      // Check Maintenance Mode for non-superadmins
+      if (req.user.role !== 'superadmin') {
+        const settings = await SystemSetting.findOne({ key: 'global' });
+        if (settings && settings.isMaintenanceMode) {
+          return res.status(503).json({
+            success: false,
+            message: settings.maintenanceMessage || 'System is under maintenance. Please try again later.',
+            isMaintenanceMode: true
+          });
+        }
+      }
 
       next();
     } catch (error) {

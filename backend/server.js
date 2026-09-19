@@ -25,6 +25,9 @@ const paymentRoutes = require('./routes/paymentRoutes');
 const dashboardRoutes = require('./routes/dashboardRoutes');
 const reportRoutes = require('./routes/reportRoutes');
 const settingsRoutes = require('./routes/settingsRoutes');
+const tenantRoutes = require('./routes/tenantRoutes');
+const packageRoutes = require('./routes/packageRoutes');
+const systemRoutes = require('./routes/systemRoutes');
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
@@ -37,6 +40,9 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/settings', settingsRoutes);
+app.use('/api/tenants', tenantRoutes);
+app.use('/api/packages', packageRoutes);
+app.use('/api/system', systemRoutes);
 
 // Root endpoint for healthchecks
 app.get('/health', (req, res) => {

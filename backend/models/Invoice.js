@@ -61,6 +61,12 @@ const InvoiceItemSchema = new mongoose.Schema({
 
 const InvoiceSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+      index: true
+    },
     invoiceNumber: {
       type: String,
       required: true,

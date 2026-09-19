@@ -1,4 +1,5 @@
 const User = require('../models/User');
+const SystemSetting = require('../models/SystemSetting');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
@@ -10,6 +11,7 @@ const generateToken = (user) => {
       username: user.username,
       email: user.email,
       role: user.role,
+      tenantId: user.tenantId,
     },
     process.env.JWT_SECRET || 'supersecretjwtkeyforbillingsoftware12345',
     {
@@ -20,41 +22,9 @@ const generateToken = (user) => {
 
 // @desc    Register user
 // @route   POST /api/auth/signup
-// @access  Public (In production, maybe limited to Admin, but we allow signup for first admin setup)
+// @access  Public (Disabled in SaaS mode. Admins are created by Superadmin)
 exports.signup = async (req, res, next) => {
-  try {
-    const { username, email, password, role } = req.body;
-
-    // Check if user exists
-    const userExists = await User.findOne({ $or: [{ email }, { username }] });
-    if (userExists) {
-      return res.status(400).json({ success: false, message: 'User already exists with this email or username' });
-    }
-
-    // Create user
-    const user = await User.create({
-      username,
-      email,
-      password,
-      role: role || 'staff', // default role
-    });
-
-    const token = generateToken(user);
-
-    res.status(201).json({
-      success: true,
-      token,
-      user: {
-        id: user._id,
-        username: user.username,
-        email: user.email,
-        role: user.role,
-        profileImage: user.profileImage,
-      },
-    });
-  } catch (error) {
-    next(error);
-  }
+  return res.status(403).json({ success: false, message: 'Public registration is disabled. Please contact Superadmin to purchase a plan and get an account.' });
 };
 
 // @desc    Login user
@@ -87,6 +57,17 @@ exports.login = async (req, res, next) => {
     if (!isMatch) {
       return res.status(401).json({ success: false, message: 'Invalid credentials' });
     }
+    // Check Maintenance Mode
+    if (user.role !== 'superadmin') {
+      const settings = await SystemSetting.findOne({ key: 'global' });
+      if (settings && settings.isMaintenanceMode) {
+        return res.status(503).json({ 
+          success: false, 
+          message: settings.maintenanceMessage || 'System is under maintenance. Please try again later.',
+          isMaintenanceMode: true
+        });
+      }
+    }
 
     const token = generateToken(user);
 
@@ -98,6 +79,7 @@ exports.login = async (req, res, next) => {
         username: user.username,
         email: user.email,
         role: user.role,
+        tenantId: user.tenantId,
         profileImage: user.profileImage,
       },
     });

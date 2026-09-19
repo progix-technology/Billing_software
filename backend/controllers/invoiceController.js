@@ -5,13 +5,13 @@ const InventoryLog = require('../models/InventoryLog');
 const PDFDocument = require('pdfkit');
 
 // Generate invoice number automatically
-const generateInvoiceNumber = async () => {
+const generateInvoiceNumber = async (tenantId) => {
   const date = new Date();
   const dateStr = date.getFullYear().toString() +
     (date.getMonth() + 1).toString().padStart(2, '0') +
     date.getDate().toString().padStart(2, '0');
 
-  const count = await Invoice.countDocuments();
+  const count = await Invoice.countDocuments({ tenantId });
   const sequence = (count + 1).toString().padStart(4, '0');
   
   return `INV-${dateStr}-${sequence}`;
@@ -23,7 +23,7 @@ const generateInvoiceNumber = async () => {
 exports.getInvoices = async (req, res, next) => {
   try {
     const { search, status, paymentMethod, page = 1, limit = 50 } = req.query;
-    const query = {};
+    const query = { tenantId: req.user.tenantId };
 
     if (status) {
       query.status = status;
@@ -36,6 +36,7 @@ exports.getInvoices = async (req, res, next) => {
     if (search) {
       // Search by customer name
       const customers = await Customer.find({
+        tenantId: req.user.tenantId,
         $or: [
           { name: { $regex: search, $options: 'i' } },
           { phone: { $regex: search, $options: 'i' } }
@@ -79,7 +80,7 @@ exports.getInvoices = async (req, res, next) => {
 // @access  Private
 exports.getInvoice = async (req, res, next) => {
   try {
-    const invoice = await Invoice.findById(req.params.id)
+    const invoice = await Invoice.findOne({ _id: req.params.id, tenantId: req.user.tenantId })
       .populate('customer')
       .populate('items.product')
       .populate('cashier', 'username');
@@ -110,7 +111,7 @@ exports.createInvoice = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'Invoice must contain at least one item' });
     }
 
-    const customer = await Customer.findById(customerId);
+    const customer = await Customer.findOne({ _id: customerId, tenantId: req.user.tenantId });
     if (!customer) {
       return res.status(404).json({ success: false, message: 'Customer not found' });
     }
@@ -122,7 +123,7 @@ exports.createInvoice = async (req, res, next) => {
 
     // Process items and calculate pricing
     for (const item of items) {
-      const product = await Product.findById(item.productId);
+      const product = await Product.findOne({ _id: item.productId, tenantId: req.user.tenantId });
       if (!product) {
         return res.status(404).json({ success: false, message: `Product not found: ${item.productId}` });
       }
@@ -187,10 +188,11 @@ exports.createInvoice = async (req, res, next) => {
       status = paidAmount > 0 ? 'PARTIAL' : 'UNPAID';
     }
 
-    const invoiceNumber = await generateInvoiceNumber();
+    const invoiceNumber = await generateInvoiceNumber(req.user.tenantId);
 
     // Create Invoice inside DB
     const invoice = await Invoice.create({
+      tenantId: req.user.tenantId,
       invoiceNumber,
       customer: customerId,
       items: invoiceItems,
@@ -208,7 +210,7 @@ exports.createInvoice = async (req, res, next) => {
 
     // Deduct stock levels and write logs
     for (const item of invoiceItems) {
-      const product = await Product.findById(item.product);
+      const product = await Product.findOne({ _id: item.product, tenantId: req.user.tenantId });
       const prevStock = product.stockQuantity;
       const currentStock = prevStock - item.quantity;
       
@@ -216,6 +218,7 @@ exports.createInvoice = async (req, res, next) => {
       await product.save();
 
       await InventoryLog.create({
+        tenantId: req.user.tenantId,
         product: product._id,
         type: 'OUT',
         quantity: item.quantity,
@@ -248,7 +251,7 @@ exports.createInvoice = async (req, res, next) => {
 // @access  Private
 exports.getInvoicePDF = async (req, res, next) => {
   try {
-    const invoice = await Invoice.findById(req.params.id)
+    const invoice = await Invoice.findOne({ _id: req.params.id, tenantId: req.user.tenantId })
       .populate('customer')
       .populate('cashier', 'username');
 

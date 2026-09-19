@@ -8,7 +8,7 @@ const Supplier = require('../models/Supplier');
 exports.getPayments = async (req, res, next) => {
   try {
     const { customerId, supplierId, type } = req.query;
-    const query = {};
+    const query = { tenantId: req.user.tenantId };
 
     if (customerId) query.customer = customerId;
     if (supplierId) query.supplier = supplierId;
@@ -51,12 +51,13 @@ exports.createPayment = async (req, res, next) => {
       if (!customerId) {
         return res.status(400).json({ success: false, message: 'Customer ID is required for inbound payments' });
       }
-      const customer = await Customer.findById(customerId);
+      const customer = await Customer.findOne({ _id: customerId, tenantId: req.user.tenantId });
       if (!customer) {
         return res.status(404).json({ success: false, message: 'Customer not found' });
       }
 
       payment = await Payment.create({
+        tenantId: req.user.tenantId,
         paymentReference: payRef,
         customer: customerId,
         type: 'INBOUND',
@@ -72,12 +73,13 @@ exports.createPayment = async (req, res, next) => {
       if (!supplierId) {
         return res.status(400).json({ success: false, message: 'Supplier ID is required for outbound payments' });
       }
-      const supplier = await Supplier.findById(supplierId);
+      const supplier = await Supplier.findOne({ _id: supplierId, tenantId: req.user.tenantId });
       if (!supplier) {
         return res.status(404).json({ success: false, message: 'Supplier not found' });
       }
 
       payment = await Payment.create({
+        tenantId: req.user.tenantId,
         paymentReference: payRef,
         supplier: supplierId,
         type: 'OUTBOUND',

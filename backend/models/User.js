@@ -24,9 +24,14 @@ const UserSchema = new mongoose.Schema(
       minlength: 6,
       select: false,
     },
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      // Optional because superadmin does not have a tenant
+    },
     role: {
       type: String,
-      enum: ['admin', 'manager', 'staff'],
+      enum: ['superadmin', 'admin', 'manager', 'staff'],
       default: 'staff',
     },
     status: {

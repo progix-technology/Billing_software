@@ -19,12 +19,21 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('token') || null);
   const [loading, setLoading] = useState(true);
 
-  // Setup request interceptor to automatically add authorization token
+  // Synchronously set the default authorization header
+  if (token) {
+    api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
+  } else {
+    delete api.defaults.headers.common['Authorization'];
+  }
+
+  // Setup request interceptor (optional now that we use defaults, but keeping for completeness if needed)
   useEffect(() => {
     const requestInterceptor = api.interceptors.request.use(
       (config) => {
-        if (token) {
-          config.headers.Authorization = `Bearer ${token}`;
+        // Fallback to localStorage if the state token is somehow out of sync during a quick request
+        const currentToken = localStorage.getItem('token');
+        if (currentToken) {
+          config.headers.Authorization = `Bearer ${currentToken}`;
         }
         return config;
       },
@@ -77,12 +86,13 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('token', res.data.token);
         setToken(res.data.token);
         setUser(res.data.user);
-        return { success: true };
+        return { success: true, user: res.data.user };
       }
     } catch (error) {
       return {
         success: false,
-        message: error.response?.data?.message || 'Login failed, please check credentials'
+        message: error.response?.data?.message || 'Login failed, please check credentials',
+        isMaintenanceMode: error.response?.data?.isMaintenanceMode || false
       };
     }
   };

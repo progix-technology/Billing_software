@@ -2,6 +2,12 @@ const mongoose = require('mongoose');
 
 const StoreSettingSchema = new mongoose.Schema(
   {
+    tenantId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: true,
+      index: true
+    },
     storeName: {
       type: String,
       default: 'Enterprise Billing Solutions',

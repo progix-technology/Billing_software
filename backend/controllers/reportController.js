@@ -8,7 +8,7 @@ const XLSX = require('xlsx');
 exports.getGstReport = async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
-    const match = {};
+    const match = { tenantId: req.user.tenantId };
 
     if (startDate || endDate) {
       match.createdAt = {};
@@ -69,7 +69,10 @@ exports.getProfitLossReport = async (req, res, next) => {
     }
 
     // 1. Calculate sales revenue and cost of goods sold (COGS)
-    const matchQuery = startDate || endDate ? { createdAt: dateQuery.createdAt } : {};
+    const matchQuery = { tenantId: req.user.tenantId };
+    if (startDate || endDate) {
+      matchQuery.createdAt = dateQuery.createdAt;
+    }
     const invoices = await Invoice.find(matchQuery);
 
     let totalRevenue = 0;
@@ -108,7 +111,7 @@ exports.getProfitLossReport = async (req, res, next) => {
 exports.exportSalesExcel = async (req, res, next) => {
   try {
     const { startDate, endDate } = req.query;
-    const match = {};
+    const match = { tenantId: req.user.tenantId };
 
     if (startDate || endDate) {
       match.createdAt = {};
@@ -162,7 +165,7 @@ exports.exportSalesExcel = async (req, res, next) => {
 // @access  Private (Admin or Manager)
 exports.exportStockExcel = async (req, res, next) => {
   try {
-    const products = await Product.find().populate('category', 'name').sort({ stockQuantity: 1 });
+    const products = await Product.find({ tenantId: req.user.tenantId }).populate('category', 'name').sort({ stockQuantity: 1 });
 
     const data = products.map((p) => ({
       'Product Name': p.name,

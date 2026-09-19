@@ -12,7 +12,6 @@ import SplashScreen from './components/Common/SplashScreen';
 
 // Pages
 import Login from './pages/Login';
-import Signup from './pages/Signup';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
 import Dashboard from './pages/Dashboard';
@@ -25,6 +24,10 @@ import Inventory from './pages/Inventory';
 import Reports from './pages/Reports';
 import SettingsPage from './pages/Settings';
 import Profile from './pages/Profile';
+import SuperAdminLayout from './components/Layout/SuperAdminLayout';
+import SuperAdminDashboard from './pages/SuperAdminDashboard';
+import SuperAdminPackages from './pages/SuperAdminPackages';
+import SuperAdminSettings from './pages/SuperAdminSettings';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -54,7 +57,6 @@ function App() {
             <Routes>
               {/* Public Auth Routes */}
               <Route path="/login" element={<Login />} />
-              <Route path="/signup" element={<Signup />} />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
 
@@ -70,6 +72,13 @@ function App() {
                 <Route path="/reports" element={<Reports />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="/profile" element={<Profile />} />
+              </Route>
+
+              {/* Protected SuperAdmin Routes */}
+              <Route element={<SuperAdminLayout />}>
+                <Route path="/superadmin" element={<SuperAdminDashboard />} />
+                <Route path="/superadmin/packages" element={<SuperAdminPackages />} />
+                <Route path="/superadmin/settings" element={<SuperAdminSettings />} />
               </Route>
 
               {/* Fallback Redirect */}

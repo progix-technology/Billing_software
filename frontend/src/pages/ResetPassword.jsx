@@ -38,8 +38,15 @@ const ResetPassword = () => {
   };
 
   return (
-    <div className="min-h-screen bg-cream-100 flex items-center justify-center p-4">
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-2xl shadow-xl p-8 relative z-10 transition-colors duration-350">
+    <div
+      className="min-h-screen flex items-center justify-center p-4 relative overflow-hidden"
+      style={{
+        backgroundImage: `url('/splash_screen_bg.png')`,
+        backgroundSize: 'cover',
+        backgroundPosition: 'center',
+      }}
+    >
+      <div className="w-full max-w-md bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-2xl p-8 relative z-10 transition-colors duration-350">
         <div className="mb-6">
           <h2 className="text-2xl font-bold text-slate-900">Create New Password</h2>
           <p className="text-sm text-slate-500 mt-1">Please enter your new system password</p>

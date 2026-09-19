@@ -28,7 +28,7 @@ const generateSequentialBarcode = async () => {
 exports.getProducts = async (req, res, next) => {
   try {
     const { category, search, page = 1, limit = 50, lowStock } = req.query;
-    const query = {};
+    const query = { tenantId: req.user.tenantId };
 
     if (category) {
       query.$or = [
@@ -80,7 +80,7 @@ exports.getProducts = async (req, res, next) => {
 // @access  Private
 exports.getProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id)
+    const product = await Product.findOne({ _id: req.params.id, tenantId: req.user.tenantId })
       .populate('category', 'name')
       .populate('subCategory', 'name');
     if (!product) {
@@ -115,7 +115,7 @@ exports.createProduct = async (req, res, next) => {
     const finalSku = sku ? sku.trim() : generateSKU(name);
 
     // Check SKU unique
-    const skuExists = await Product.findOne({ sku: finalSku });
+    const skuExists = await Product.findOne({ sku: finalSku, tenantId: req.user.tenantId });
     if (skuExists) {
       return res.status(400).json({ success: false, message: `SKU '${finalSku}' is already in use.` });
     }
@@ -123,7 +123,7 @@ exports.createProduct = async (req, res, next) => {
     // Check Barcode unique if provided
     let finalBarcode = barcode ? barcode.trim() : undefined;
     if (finalBarcode) {
-      const barcodeExists = await Product.findOne({ barcode: finalBarcode });
+      const barcodeExists = await Product.findOne({ barcode: finalBarcode, tenantId: req.user.tenantId });
       if (barcodeExists) {
         return res.status(400).json({ success: false, message: 'Barcode is already in use.' });
       }
@@ -132,6 +132,7 @@ exports.createProduct = async (req, res, next) => {
     }
 
     const product = await Product.create({
+      tenantId: req.user.tenantId,
       name,
       sku: finalSku,
       barcode: finalBarcode,
@@ -148,6 +149,7 @@ exports.createProduct = async (req, res, next) => {
 
     // Create Initial Inventory Log
     await InventoryLog.create({
+      tenantId: req.user.tenantId,
       product: product._id,
       type: 'IN',
       quantity: product.stockQuantity,
@@ -169,7 +171,7 @@ exports.createProduct = async (req, res, next) => {
 // @access  Private (Admin or Manager)
 exports.updateProduct = async (req, res, next) => {
   try {
-    let product = await Product.findById(req.params.id);
+    let product = await Product.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
@@ -179,7 +181,7 @@ exports.updateProduct = async (req, res, next) => {
 
     // SKU uniqueness check if changing
     if (otherData.sku && otherData.sku !== product.sku) {
-      const skuExists = await Product.findOne({ sku: otherData.sku });
+      const skuExists = await Product.findOne({ sku: otherData.sku, tenantId: req.user.tenantId });
       if (skuExists) {
         return res.status(400).json({ success: false, message: 'SKU is already in use.' });
       }
@@ -187,16 +189,17 @@ exports.updateProduct = async (req, res, next) => {
 
     // Barcode uniqueness check if changing
     if (otherData.barcode && otherData.barcode !== product.barcode) {
-      const barcodeExists = await Product.findOne({ barcode: otherData.barcode });
+      const barcodeExists = await Product.findOne({ barcode: otherData.barcode, tenantId: req.user.tenantId });
       if (barcodeExists) {
         return res.status(400).json({ success: false, message: 'Barcode is already in use.' });
       }
     }
 
-    product = await Product.findByIdAndUpdate(req.params.id, otherData, {
-      new: true,
-      runValidators: true,
-    });
+    product = await Product.findOneAndUpdate(
+      { _id: req.params.id, tenantId: req.user.tenantId },
+      otherData, 
+      { new: true, runValidators: true }
+    );
 
     // Handle manual stock level adjustment
     if (stockQuantity !== undefined && stockQuantity !== oldStock) {
@@ -205,6 +208,7 @@ exports.updateProduct = async (req, res, next) => {
       await product.save();
 
       await InventoryLog.create({
+        tenantId: req.user.tenantId,
         product: product._id,
         type: qtyDiff > 0 ? 'IN' : 'OUT',
         quantity: Math.abs(qtyDiff),
@@ -227,7 +231,7 @@ exports.updateProduct = async (req, res, next) => {
 // @access  Private (Admin or Manager)
 exports.deleteProduct = async (req, res, next) => {
   try {
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
     }
@@ -245,7 +249,7 @@ exports.deleteProduct = async (req, res, next) => {
 exports.stockIn = async (req, res, next) => {
   try {
     const { quantity, supplierPrice, remarks, referenceId } = req.body;
-    const product = await Product.findById(req.params.id);
+    const product = await Product.findOne({ _id: req.params.id, tenantId: req.user.tenantId });
 
     if (!product) {
       return res.status(404).json({ success: false, message: 'Product not found' });
@@ -261,6 +265,7 @@ exports.stockIn = async (req, res, next) => {
     await product.save();
 
     await InventoryLog.create({
+      tenantId: req.user.tenantId,
       product: product._id,
       type: 'IN',
       quantity: parseInt(quantity),
@@ -283,6 +288,7 @@ exports.stockIn = async (req, res, next) => {
 exports.getLowStockAlerts = async (req, res, next) => {
   try {
     const products = await Product.find({
+      tenantId: req.user.tenantId,
       $expr: { $lte: ['$stockQuantity', '$minStockLevel'] },
     }).populate('category', 'name').populate('subCategory', 'name');
 
@@ -297,7 +303,7 @@ exports.getLowStockAlerts = async (req, res, next) => {
 // @access  Private
 exports.getProductLogs = async (req, res, next) => {
   try {
-    const logs = await InventoryLog.find({ product: req.params.id })
+    const logs = await InventoryLog.find({ product: req.params.id, tenantId: req.user.tenantId })
       .populate('user', 'username')
       .sort({ createdAt: -1 });
 
@@ -312,7 +318,7 @@ exports.getProductLogs = async (req, res, next) => {
 // @access  Private
 exports.getAllInventoryLogs = async (req, res, next) => {
   try {
-    const logs = await InventoryLog.find()
+    const logs = await InventoryLog.find({ tenantId: req.user.tenantId })
       .populate('product', 'name sku barcode')
       .populate('user', 'username')
       .sort({ createdAt: -1 });
