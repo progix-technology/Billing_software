@@ -1,6 +1,12 @@
 node_modules/
 dist/
 .env
+.env.*
+*.env
+backend/.env
+frontend/.env
+!.env.example
+!backend/.env.example
 .DS_Store
 dist-electron/
 release/

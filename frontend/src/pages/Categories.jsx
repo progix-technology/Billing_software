@@ -7,11 +7,12 @@ const Categories = () => {
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  
+
   // Modal states
   const [showModal, setShowModal] = useState(false);
   const [modalMode, setModalMode] = useState('CREATE'); // CREATE or EDIT
   const [editId, setEditId] = useState(null);
+
   const [categoryName, setCategoryName] = useState('');
   const [categoryDesc, setCategoryDesc] = useState('');
   const [subCategoriesInput, setSubCategoriesInput] = useState('');
@@ -57,12 +58,12 @@ const Categories = () => {
     setEditId(cat._id);
     setCategoryName(cat.name);
     setCategoryDesc(cat.description || '');
-    
+
     // Find children and compile into comma-separated text
     const childSubs = categories.filter(c => c.parent?._id === cat._id || c.parent === cat._id);
     const subNames = childSubs.map(s => s.name).join(', ');
     setSubCategoriesInput(subNames);
-    
+
     setError('');
     setShowModal(true);
   };
@@ -179,83 +180,83 @@ const Categories = () => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-sm">
-              {filteredCategories.map((cat) => {
-                const childSubs = categories.filter(c => c.parent?._id === cat._id || c.parent === cat._id);
-                const isExpanded = !!expandedIds[cat._id];
-                return (
-                  <React.Fragment key={cat._id}>
-                    <tr 
-                      className="hover:bg-slate-50/30 dark:hover:bg-slate-800/10 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer select-none"
-                      onClick={() => toggleRow(cat._id)}
-                    >
-                      <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                        <span className="text-slate-400">
-                          {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
-                        </span>
-                        {cat.name}
-                      </td>
-                      <td className="py-4 px-6 text-slate-500 dark:text-slate-400">{cat.description || 'N/A'}</td>
-                      <td className="py-4 px-6">
-                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary-100 text-primary-600">
-                          {childSubs.length} Subcategories
-                        </span>
-                      </td>
-                      <td className="py-4 px-6 text-right space-x-2" onClick={(e) => e.stopPropagation()}>
-                        <button
-                          onClick={() => openEditModal(cat)}
-                          className="inline-flex p-2 text-slate-500 hover:text-primary-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                          title="Edit"
-                        >
-                          <Edit2 className="h-4 w-4" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(cat._id)}
-                          className="inline-flex p-2 text-slate-500 hover:text-red-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                          title="Delete"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      </td>
-                    </tr>
-                    {isExpanded && (
-                      childSubs.length > 0 ? (
-                        childSubs.map((sub, idx) => {
-                          const isLast = idx === childSubs.length - 1;
-                          const treePrefix = isLast ? '└─ ' : '├─ ';
-                          return (
-                            <tr 
-                              key={sub._id} 
-                              className="bg-slate-50/10 dark:bg-slate-950/5 text-slate-600 dark:text-slate-450 border-b border-slate-100/50 dark:border-slate-850/30"
-                            >
-                              <td className="py-2.5 pl-14 pr-6 font-medium text-slate-600 dark:text-slate-450">
-                                <span className="text-slate-400 dark:text-slate-650 font-mono select-none mr-2">{treePrefix}</span>
-                                {sub.name}
-                              </td>
-                              <td className="py-2.5 px-6 text-slate-400 dark:text-slate-500 text-xs italic">
-                                Subcategory
-                              </td>
-                              <td className="py-2.5 px-6 text-slate-400 dark:text-slate-500 text-xs">
-                                —
-                              </td>
-                              <td className="py-2.5 px-6"></td>
-                            </tr>
-                          );
-                        })
-                      ) : (
-                        <tr className="bg-slate-50/10 dark:bg-slate-950/5 text-slate-400">
-                          <td colSpan={4} className="py-3 pl-14 pr-6 text-xs italic">
-                            No subcategories defined for this category.
-                          </td>
-                        </tr>
-                      )
-                    )}
-                  </React.Fragment>
-                );
-              })}
+                {filteredCategories.map((cat) => {
+                  const childSubs = categories.filter(c => c.parent?._id === cat._id || c.parent === cat._id);
+                  const isExpanded = !!expandedIds[cat._id];
+                  return (
+                    <React.Fragment key={cat._id}>
+                      <tr
+                        className="hover:bg-slate-50/30 dark:hover:bg-slate-800/10 text-slate-700 dark:text-slate-300 transition-colors cursor-pointer select-none"
+                        onClick={() => toggleRow(cat._id)}
+                      >
+                        <td className="py-4 px-6 font-semibold text-slate-900 dark:text-white flex items-center gap-2">
+                          <span className="text-slate-400">
+                            {isExpanded ? (
+                              <ChevronDown className="h-4 w-4" />
+                            ) : (
+                              <ChevronRight className="h-4 w-4" />
+                            )}
+                          </span>
+                          {cat.name}
+                        </td>
+                        <td className="py-4 px-6 text-slate-500 dark:text-slate-400">{cat.description || 'N/A'}</td>
+                        <td className="py-4 px-6">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-primary-100 text-primary-600">
+                            {childSubs.length} Subcategories
+                          </span>
+                        </td>
+                        <td className="py-4 px-6 text-right space-x-2" onClick={(e) => e.stopPropagation()}>
+                          <button
+                            onClick={() => openEditModal(cat)}
+                            className="inline-flex p-2 text-slate-500 hover:text-primary-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="Edit"
+                          >
+                            <Edit2 className="h-4 w-4" />
+                          </button>
+                          <button
+                            onClick={() => handleDelete(cat._id)}
+                            className="inline-flex p-2 text-slate-500 hover:text-red-500 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        childSubs.length > 0 ? (
+                          childSubs.map((sub, idx) => {
+                            const isLast = idx === childSubs.length - 1;
+                            const treePrefix = isLast ? '└─ ' : '├─ ';
+                            return (
+                              <tr
+                                key={sub._id}
+                                className="bg-slate-50/10 dark:bg-slate-950/5 text-slate-600 dark:text-slate-450 border-b border-slate-100/50 dark:border-slate-850/30"
+                              >
+                                <td className="py-2.5 pl-14 pr-6 font-medium text-slate-600 dark:text-slate-450">
+                                  <span className="text-slate-400 dark:text-slate-650 font-mono select-none mr-2">{treePrefix}</span>
+                                  {sub.name}
+                                </td>
+                                <td className="py-2.5 px-6 text-slate-400 dark:text-slate-500 text-xs italic">
+                                  Subcategory
+                                </td>
+                                <td className="py-2.5 px-6 text-slate-400 dark:text-slate-500 text-xs">
+                                  —
+                                </td>
+                                <td className="py-2.5 px-6"></td>
+                              </tr>
+                            );
+                          })
+                        ) : (
+                          <tr className="bg-slate-50/10 dark:bg-slate-950/5 text-slate-400">
+                            <td colSpan={4} className="py-3 pl-14 pr-6 text-xs italic">
+                              No subcategories defined for this category.
+                            </td>
+                          </tr>
+                        )
+                      )}
+                    </React.Fragment>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -274,14 +275,14 @@ const Categories = () => {
                 <X className="h-5 w-5" />
               </button>
             </div>
-            
+
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
               {error && (
                 <div className="p-3 bg-red-500/10 border border-red-500/20 text-xs text-red-500 rounded-lg">
                   {error}
                 </div>
               )}
-              
+
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                   Category Name
