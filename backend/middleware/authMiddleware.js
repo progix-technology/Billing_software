@@ -1,5 +1,4 @@
 const jwt = require('jsonwebtoken');
-const mongoose = require('mongoose');
 const SystemSetting = require('../models/SystemSetting');
 
 // Protect Routes (JWT Validation)

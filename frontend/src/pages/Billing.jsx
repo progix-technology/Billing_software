@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { api } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import useSessionStorage from '../hooks/useSessionStorage';
-import { Calculator, Search, Trash2, CreditCard, ChevronRight, UserPlus, X, Printer, Download, CheckCircle, Camera } from 'lucide-react';
+import { Calculator, Search, Trash2, CreditCard, ChevronRight, UserPlus, X, Printer, Download, CheckCircle, Camera, Key, Copy, Check, PhoneCall, AlertTriangle } from 'lucide-react';
 import CameraScanner from '../components/CameraScanner';
 
 const Billing = () => {
@@ -38,7 +38,49 @@ const Billing = () => {
   const [printLayout, setPrintLayout] = useState('A4'); // A4 or THERMAL
   const [showScanner, setShowScanner] = useState(false);
 
+  // License & Subscription Lock States
+  const [licenseStatus, setLicenseStatus] = useState(null);
+  const [showLicenseModal, setShowLicenseModal] = useState(false);
+  const [licenseKeyInput, setLicenseKeyInput] = useState('');
+  const [licenseLoading, setLicenseLoading] = useState(false);
+  const [licenseMsg, setLicenseMsg] = useState({ type: '', text: '' });
+  const [copiedId, setCopiedId] = useState(false);
+
   const printAreaRef = useRef(null);
+
+  const fetchLicense = async () => {
+    try {
+      const res = await api.get('/api/license/status');
+      if (res.data.success) {
+        setLicenseStatus(res.data);
+        if (res.data.isExpired) {
+          setShowLicenseModal(true);
+        }
+      }
+    } catch (err) {
+      console.error('License status check failed', err);
+    }
+  };
+
+  const handleActivateLicense = async (e) => {
+    e.preventDefault();
+    if (!licenseKeyInput.trim()) return;
+    setLicenseLoading(true);
+    setLicenseMsg({ type: '', text: '' });
+    try {
+      const res = await api.post('/api/license/activate', { licenseKey: licenseKeyInput.trim() });
+      if (res.data.success) {
+        setLicenseMsg({ type: 'success', text: `Subscription active! Plan: ${res.data.planName}` });
+        setLicenseKeyInput('');
+        await fetchLicense();
+        setTimeout(() => setShowLicenseModal(false), 1500);
+      }
+    } catch (err) {
+      setLicenseMsg({ type: 'error', text: err.response?.data?.message || 'Invalid license key.' });
+    } finally {
+      setLicenseLoading(false);
+    }
+  };
 
   // Load lists
   const fetchProducts = async () => {
@@ -66,6 +108,7 @@ const Billing = () => {
   useEffect(() => {
     fetchProducts();
     fetchCustomers();
+    fetchLicense();
   }, []);
 
   // Handle adding product to cart
@@ -201,6 +244,11 @@ const Billing = () => {
 
   // Checkout POST
   const handleCheckout = async () => {
+    if (licenseStatus && licenseStatus.isExpired) {
+      setShowLicenseModal(true);
+      return;
+    }
+
     if (!selectedCustomer) {
       return alert('Please select a Customer for this invoice.');
     }
@@ -232,7 +280,11 @@ const Billing = () => {
         setShowPreviewModal(true);
       }
     } catch (err) {
-      alert(err.response?.data?.message || 'Checkout failed');
+      if (err.response?.data?.isLicenseExpired) {
+        setShowLicenseModal(true);
+      } else {
+        alert(err.response?.data?.message || 'Checkout failed');
+      }
     }
   };
 
@@ -959,6 +1011,112 @@ const Billing = () => {
             }
           }}
         />
+      )}
+
+      {/* Subscription Expired / License Key Modal */}
+      {showLicenseModal && createPortal(
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm animate-fade-in">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl max-w-lg w-full p-6 shadow-2xl relative space-y-5">
+            <div className="flex items-start gap-4">
+              <div className="p-3 bg-rose-500/10 text-rose-500 rounded-2xl shrink-0">
+                <AlertTriangle className="h-7 w-7" />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white">
+                  Subscription Plan Required
+                </h3>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
+                  Your billing subscription or free trial period has ended. Please enter your offline license activation key to unlock checkout.
+                </p>
+              </div>
+            </div>
+
+            {/* Machine ID Box */}
+            <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl space-y-2">
+              <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Your Machine Hardware ID</span>
+              <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                <code className="text-xs font-mono font-bold text-primary-600 dark:text-primary-400 select-all">
+                  {licenseStatus?.machineId || 'PRGX-OFFLINE'}
+                </code>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (licenseStatus?.machineId) {
+                      navigator.clipboard.writeText(licenseStatus.machineId);
+                      setCopiedId(true);
+                      setTimeout(() => setCopiedId(false), 2500);
+                    }
+                  }}
+                  className="px-2.5 py-1 text-xs font-medium bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-lg flex items-center gap-1 transition-colors"
+                >
+                  {copiedId ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Copy className="h-3.5 w-3.5" />}
+                  <span>{copiedId ? 'Copied' : 'Copy'}</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Support Hotline */}
+            <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 rounded-2xl flex items-center justify-between text-xs">
+              <div>
+                <span className="font-semibold text-amber-700 dark:text-amber-400 block">Need a License Key?</span>
+                <span className="text-slate-600 dark:text-slate-300 text-[11px]">Call or WhatsApp Progix Technology Support:</span>
+              </div>
+              <a
+                href="tel:+918953208952"
+                className="font-mono font-bold text-xs bg-amber-600 text-white px-3 py-1.5 rounded-xl shadow-sm hover:bg-amber-500 transition-colors flex items-center gap-1.5"
+              >
+                <PhoneCall className="h-3.5 w-3.5" />
+                +91 89532 08952
+              </a>
+            </div>
+
+            {/* Activation Form */}
+            <form onSubmit={handleActivateLicense} className="space-y-3">
+              <div>
+                <label className="block text-[11px] font-bold uppercase text-slate-500 dark:text-slate-400 mb-1.5">
+                  Enter License Activation Key
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="PRGX-GOLD-..."
+                  value={licenseKeyInput}
+                  onChange={(e) => setLicenseKeyInput(e.target.value)}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold tracking-wider text-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+              </div>
+
+              {licenseMsg.text && (
+                <div className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
+                  licenseMsg.type === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                }`}>
+                  {licenseMsg.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
+                  <span>{licenseMsg.text}</span>
+                </div>
+              )}
+
+              <div className="flex gap-2.5 pt-2">
+                {!licenseStatus?.isExpired && (
+                  <button
+                    type="button"
+                    onClick={() => setShowLicenseModal(false)}
+                    className="flex-1 px-4 py-2.5 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 rounded-xl text-xs font-semibold transition-colors"
+                  >
+                    Close
+                  </button>
+                )}
+                <button
+                  type="submit"
+                  disabled={licenseLoading || !licenseKeyInput.trim()}
+                  className="flex-1 px-4 py-2.5 bg-primary-600 hover:bg-primary-500 text-white rounded-xl text-xs font-semibold shadow-lg transition-colors disabled:opacity-50"
+                >
+                  {licenseLoading ? 'Activating...' : 'Activate Subscription'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>,
+        document.body
       )}
     </div>
   );

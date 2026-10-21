@@ -28,6 +28,8 @@ const settingsRoutes = require('./routes/settingsRoutes');
 const tenantRoutes = require('./routes/tenantRoutes');
 const packageRoutes = require('./routes/packageRoutes');
 const systemRoutes = require('./routes/systemRoutes');
+const licenseRoutes = require('./routes/licenseRoutes');
+const backupRoutes = require('./routes/backupRoutes');
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
@@ -43,6 +45,8 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/tenants', tenantRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/system', systemRoutes);
+app.use('/api/license', licenseRoutes);
+app.use('/api/backup', backupRoutes);
 
 // Root endpoint for healthchecks
 app.get('/health', (req, res) => {

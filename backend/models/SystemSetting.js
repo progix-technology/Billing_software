@@ -1,25 +1,5 @@
-const mongoose = require('mongoose');
+const { createModel } = require('../config/nedbAdapter');
 
-const SystemSettingSchema = new mongoose.Schema(
-  {
-    // A singleton document identifier
-    key: {
-      type: String,
-      default: 'global',
-      unique: true,
-    },
-    isMaintenanceMode: {
-      type: Boolean,
-      default: false,
-    },
-    maintenanceMessage: {
-      type: String,
-      default: 'System is under maintenance. Please try again later.',
-    },
-  },
-  {
-    timestamps: true,
-  }
-);
+const SystemSetting = createModel('systemSettings');
 
-module.exports = mongoose.model('SystemSetting', SystemSettingSchema);
+module.exports = SystemSetting;

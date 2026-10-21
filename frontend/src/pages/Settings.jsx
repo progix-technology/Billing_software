@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { api } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
-import { Settings, Download, Upload, ShieldCheck, Store, Database, CheckCircle, AlertCircle, Image } from 'lucide-react';
+import { Settings, Download, Upload, ShieldCheck, Store, Database, CheckCircle, AlertCircle, Key, Copy, Check, PhoneCall, Calendar } from 'lucide-react';
 
 const SettingsPage = () => {
   const { settings, updateSettings } = useSettings();
@@ -18,7 +18,26 @@ const SettingsPage = () => {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
 
+  // Offline License & Subscription States
+  const [licenseStatus, setLicenseStatus] = useState(null);
+  const [licenseKeyInput, setLicenseKeyInput] = useState('');
+  const [licenseLoading, setLicenseLoading] = useState(false);
+  const [licenseMessage, setLicenseMessage] = useState({ type: '', text: '' });
+  const [copiedMachineId, setCopiedMachineId] = useState(false);
+
+  const fetchLicense = async () => {
+    try {
+      const res = await api.get('/api/license/status');
+      if (res.data.success) {
+        setLicenseStatus(res.data);
+      }
+    } catch (err) {
+      console.error('Failed to load offline license status', err);
+    }
+  };
+
   useEffect(() => {
+    fetchLicense();
     if (settings) {
       if (settings.storeName) setStoreName(settings.storeName);
       if (settings.storeGst) setStoreGst(settings.storeGst);
@@ -36,6 +55,33 @@ const SettingsPage = () => {
       }
     }
   }, [settings]);
+
+  const handleCopyMachineId = () => {
+    if (licenseStatus?.machineId) {
+      navigator.clipboard.writeText(licenseStatus.machineId);
+      setCopiedMachineId(true);
+      setTimeout(() => setCopiedMachineId(false), 2500);
+    }
+  };
+
+  const handleActivateLicense = async (e) => {
+    e.preventDefault();
+    if (!licenseKeyInput.trim()) return;
+    setLicenseLoading(true);
+    setLicenseMessage({ type: '', text: '' });
+    try {
+      const res = await api.post('/api/license/activate', { licenseKey: licenseKeyInput.trim() });
+      if (res.data.success) {
+        setLicenseMessage({ type: 'success', text: `License successfully activated! Plan: ${res.data.planName}` });
+        setLicenseKeyInput('');
+        fetchLicense();
+      }
+    } catch (err) {
+      setLicenseMessage({ type: 'error', text: err.response?.data?.message || 'Invalid or expired license key.' });
+    } finally {
+      setLicenseLoading(false);
+    }
+  };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
@@ -88,19 +134,19 @@ const SettingsPage = () => {
     setLoading(true);
     setError('');
     try {
-      const response = await api.get('/api/settings/backup', { responseType: 'blob' });
+      const response = await api.get('/api/backup/export', { responseType: 'blob' });
       const file = new Blob([response.data], { type: 'application/json' });
       const fileURL = URL.createObjectURL(file);
       const link = document.createElement('a');
       link.href = fileURL;
-      link.setAttribute('download', `erp_backup_${new Date().toISOString().split('T')[0]}.json`);
+      link.setAttribute('download', `probilling-offline-backup-${new Date().toISOString().split('T')[0]}.json`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
-      setSuccess('Database backup file successfully downloaded');
+      setSuccess('Full offline database backup successfully downloaded!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Database extraction backup failed. Admin authorization required.');
+      setError('Database backup export failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -110,7 +156,7 @@ const SettingsPage = () => {
     const file = e.target.files[0];
     if (!file) return;
 
-    if (!window.confirm('WARNING: Restoring the database will overwrite all current items, sales invoices, categories, customers, and expenses. Do you want to proceed?')) {
+    if (!window.confirm('WARNING: Restoring the database will overwrite your current offline records (Products, Customers, Invoices, Settings). Continue?')) {
       e.target.value = null;
       return;
     }
@@ -119,25 +165,25 @@ const SettingsPage = () => {
     setError('');
     setSuccess('');
 
-    const reader = new FileReader();
-    reader.onload = async (event) => {
-      try {
-        const parsedData = JSON.parse(event.target.result);
-        const res = await api.post('/api/settings/restore', { data: parsedData.data });
-        if (res.data.success) {
-          setSuccess('Database successfully restored! Reloading application states...');
-          setTimeout(() => {
-            window.location.reload();
-          }, 3000);
-        }
-      } catch (err) {
-        setError('Invalid backup JSON format. Please verify the integrity of the uploaded backup file.');
-      } finally {
-        setLoading(false);
-        e.target.value = null;
+    const formData = new FormData();
+    formData.append('backupFile', file);
+
+    try {
+      const res = await api.post('/api/backup/restore', formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      if (res.data.success) {
+        setSuccess('Database successfully restored! Reloading application...');
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000);
       }
-    };
-    reader.readAsText(file);
+    } catch (err) {
+      setError(err.response?.data?.message || 'Database restore failed. Please verify the backup JSON file.');
+    } finally {
+      setLoading(false);
+      e.target.value = null;
+    }
   };
 
   return (
@@ -320,6 +366,111 @@ const SettingsPage = () => {
                 </label>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Software License & Subscription Card */}
+        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-6 rounded-2xl shadow-sm transition-colors md:col-span-2">
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800 gap-2">
+              <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-2 text-sm uppercase tracking-wider text-slate-400">
+                <Key className="h-5 w-5 text-amber-500" /> Software License & Subscription
+              </h3>
+              {licenseStatus && (
+                <span className={`inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1 rounded-full ${
+                  licenseStatus.isExpired 
+                    ? 'bg-rose-500/10 text-rose-500 border border-rose-500/20' 
+                    : 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20'
+                }`}>
+                  <span className={`w-2 h-2 rounded-full ${licenseStatus.isExpired ? 'bg-rose-500 animate-pulse' : 'bg-emerald-500'}`}></span>
+                  {licenseStatus.isExpired ? 'SUBSCRIPTION EXPIRED' : 'ACTIVE SUBSCRIPTION'}
+                </span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              {/* Machine ID */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Unique Machine Hardware ID</span>
+                <div className="flex items-center justify-between bg-white dark:bg-slate-900 p-2.5 rounded-lg border border-slate-200 dark:border-slate-800">
+                  <code className="text-xs font-mono font-bold text-slate-900 dark:text-primary-400 select-all">
+                    {licenseStatus?.machineId || 'Generating...'}
+                  </code>
+                  <button
+                    onClick={handleCopyMachineId}
+                    title="Copy Machine ID"
+                    className="p-1.5 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-500 hover:text-primary-600 transition-colors"
+                  >
+                    {copiedMachineId ? <Check className="h-4 w-4 text-emerald-500" /> : <Copy className="h-4 w-4" />}
+                  </button>
+                </div>
+                <p className="text-[10px] text-slate-400">Share this ID with Progix support to renew your license.</p>
+              </div>
+
+              {/* Current Plan Details */}
+              <div className="p-4 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl space-y-2">
+                <span className="text-[10px] font-bold uppercase text-slate-400 block tracking-wider">Plan & Validity</span>
+                <div className="flex items-baseline justify-between">
+                  <span className="text-sm font-bold text-slate-900 dark:text-white">
+                    {licenseStatus?.planName || 'Loading...'}
+                  </span>
+                  <span className={`text-xs font-semibold ${licenseStatus?.daysLeft <= 3 ? 'text-rose-500' : 'text-slate-600 dark:text-slate-300'}`}>
+                    {licenseStatus?.daysLeft !== undefined ? `${licenseStatus.daysLeft} days remaining` : ''}
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-500 dark:text-slate-400 flex items-center gap-1.5">
+                  <Calendar className="h-3.5 w-3.5 text-slate-400" />
+                  <span>Valid until: {licenseStatus?.expiresAt ? new Date(licenseStatus.expiresAt).toLocaleDateString() : 'N/A'}</span>
+                </div>
+              </div>
+
+              {/* Support Contact */}
+              <div className="p-4 bg-gradient-to-br from-primary-500/10 via-amber-500/5 to-transparent border border-primary-500/20 rounded-xl space-y-2 flex flex-col justify-between">
+                <div>
+                  <span className="text-[10px] font-bold uppercase text-primary-600 dark:text-primary-400 block tracking-wider">License Renewal Support</span>
+                  <p className="text-xs font-semibold text-slate-900 dark:text-white mt-1">Progix Technology Support</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-300 flex items-center gap-1.5 mt-1 font-mono font-medium">
+                    <PhoneCall className="h-3.5 w-3.5 text-primary-500" />
+                    +91 89532 08952
+                  </p>
+                </div>
+                <p className="text-[10px] text-slate-400">Instant offline activation key delivery via WhatsApp/Call.</p>
+              </div>
+            </div>
+
+            {/* License Activation Form */}
+            <form onSubmit={handleActivateLicense} className="pt-2">
+              <label className="block text-xs font-bold uppercase text-slate-500 dark:text-slate-400 mb-2">
+                Enter Offline Activation License Key
+              </label>
+              <div className="flex flex-col sm:flex-row gap-3">
+                <input
+                  type="text"
+                  placeholder="e.g. PRGX-GOLD-20271021-776E-8F2D..."
+                  value={licenseKeyInput}
+                  onChange={(e) => setLicenseKeyInput(e.target.value)}
+                  className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2.5 px-3.5 text-xs font-mono text-slate-900 dark:text-white tracking-wider focus:outline-none focus:ring-2 focus:ring-primary-500"
+                />
+                <button
+                  type="submit"
+                  disabled={licenseLoading || !licenseKeyInput.trim()}
+                  className="bg-amber-600 hover:bg-amber-500 text-white font-semibold text-xs px-6 py-2.5 rounded-xl shadow transition-all disabled:opacity-50 whitespace-nowrap"
+                >
+                  {licenseLoading ? 'Activating...' : 'Activate License'}
+                </button>
+              </div>
+
+              {licenseMessage.text && (
+                <div className={`mt-3 p-3 rounded-xl text-xs flex items-center gap-2 ${
+                  licenseMessage.type === 'success' 
+                    ? 'bg-emerald-500/10 text-emerald-600 border border-emerald-500/20' 
+                    : 'bg-rose-500/10 text-rose-600 border border-rose-500/20'
+                }`}>
+                  {licenseMessage.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertCircle className="h-4 w-4" />}
+                  <span>{licenseMessage.text}</span>
+                </div>
+              )}
+            </form>
           </div>
         </div>
 

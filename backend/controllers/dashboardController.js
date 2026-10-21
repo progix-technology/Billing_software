@@ -1,7 +1,6 @@
 const Invoice = require('../models/Invoice');
 const Product = require('../models/Product');
 const Customer = require('../models/Customer');
-const mongoose = require('mongoose');
 
 // @desc    Get dashboard metrics & analytics
 // @route   GET /api/dashboard/stats
@@ -15,7 +14,7 @@ exports.getDashboardStats = async (req, res, next) => {
     startOfMonth.setDate(1);
     startOfMonth.setHours(0, 0, 0, 0);
 
-    const tenantIdObj = new mongoose.Types.ObjectId(req.user.tenantId);
+    const tenantIdObj = req.user.tenantId;
 
     // 1. Total & Today's Sales & Monthly Revenue Aggregation
     const salesStats = await Invoice.aggregate([
