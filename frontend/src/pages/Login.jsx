@@ -1,9 +1,10 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Mail, Lock, Eye, EyeOff, AlertCircle, ShieldAlert } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, AlertCircle, ShieldAlert, Key, ShieldCheck, Laptop } from 'lucide-react';
 import { api } from '../context/AuthContext';
 import MaintenancePage from './MaintenancePage';
+import ActivationModal from '../components/Common/ActivationModal';
 import logoImg from '../assets/progix_logo.png';
 import bgImg from '../assets/splash_screen_bg.png';
 
@@ -19,19 +20,41 @@ const Login = () => {
   const [systemMaintenance, setSystemMaintenance] = useState({ active: false, message: '' });
   const [overrideMaintenance, setOverrideMaintenance] = useState(false);
 
-  React.useEffect(() => {
-    const checkSettings = async () => {
-      try {
-        const res = await api.get('/api/system/settings');
-        if (res.data.settings?.isMaintenanceMode) {
-          setSystemMaintenance({ active: true, message: res.data.settings.maintenanceMessage });
-        }
-      } catch (err) {
-        console.error('Could not check system settings', err);
-      }
-    };
+  // License state for Login screen
+  const [licenseStatus, setLicenseStatus] = useState(null);
+  const [isActivationOpen, setIsActivationOpen] = useState(false);
+
+  useEffect(() => {
     checkSettings();
+    checkLicense();
   }, []);
+
+  const checkSettings = async () => {
+    try {
+      const res = await api.get('/api/system/settings');
+      if (res.data.settings?.isMaintenanceMode) {
+        setSystemMaintenance({ active: true, message: res.data.settings.maintenanceMessage });
+      }
+    } catch (err) {
+      console.error('Could not check system settings', err);
+    }
+  };
+
+  const checkLicense = async () => {
+    try {
+      const res = await api.get('/api/system/setup-status');
+      if (res.data.success) {
+        setLicenseStatus(res.data);
+        const searchParams = new URLSearchParams(window.location.hash.split('?')[1] || window.location.search);
+        const isSuperAdminMode = searchParams.get('mode') === 'superadmin';
+        if (!res.data.isActivated && !isSuperAdminMode) {
+          navigate('/activate');
+        }
+      }
+    } catch (err) {
+      console.error('Could not check license', err);
+    }
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -45,6 +68,11 @@ const Login = () => {
       if (result.user?.role === 'superadmin') {
         navigate('/superadmin');
       } else {
+        // If not superadmin, check license
+        if (licenseStatus && (!licenseStatus.isActivated || licenseStatus.isExpired)) {
+          setIsActivationOpen(true);
+          return;
+        }
         navigate('/');
       }
     } else {
@@ -227,12 +255,54 @@ const Login = () => {
           </button>
         </form>
 
-        <div className="text-center mt-6">
-          <p className="text-sm text-slate-500">
-            For support, please contact your system administrator.
+        {/* License & Device Activation Card on Main Login Page */}
+        <div className="mt-5 pt-4 border-t border-slate-200/80">
+          <div className="flex items-center justify-between p-3 rounded-xl bg-slate-50 border border-slate-200/90 text-xs">
+            <div className="flex items-center gap-2">
+              {licenseStatus?.isActivated && !licenseStatus?.isExpired ? (
+                <ShieldCheck className="w-4 h-4 text-emerald-600 flex-shrink-0" />
+              ) : (
+                <Key className="w-4 h-4 text-amber-600 flex-shrink-0" />
+              )}
+              <div className="truncate max-w-[190px]">
+                <p className="font-bold text-slate-800 leading-tight">
+                  {licenseStatus?.isActivated && !licenseStatus?.isExpired
+                    ? `${licenseStatus.planName || 'Active'} (${licenseStatus.daysRemaining}d left)`
+                    : 'Device Key Required'}
+                </p>
+                <p className="text-[10px] text-slate-500 font-mono truncate">
+                  ID: {licenseStatus?.machineId || 'Detecting...'}
+                </p>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsActivationOpen(true)}
+              className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-lg font-semibold text-[11px] transition-colors whitespace-nowrap"
+            >
+              {licenseStatus?.isActivated && !licenseStatus?.isExpired ? 'Change Key' : 'Activate Key'}
+            </button>
+          </div>
+        </div>
+
+        <div className="text-center mt-4">
+          <p className="text-xs text-slate-400">
+            Helpline & Licensing: <span className="font-semibold text-slate-600">+91 89532 08952</span>
           </p>
         </div>
       </div>
+
+      {/* Activation Modal */}
+      <ActivationModal
+        isOpen={isActivationOpen}
+        onClose={() => setIsActivationOpen(false)}
+        isDismissible={true}
+        onActivated={() => {
+          checkLicense();
+          setIsActivationOpen(false);
+        }}
+      />
     </div>
   );
 };

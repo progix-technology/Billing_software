@@ -127,7 +127,17 @@ exports.getStoreSettings = async (req, res, next) => {
 // @access  Private (Admin only)
 exports.saveStoreSettings = async (req, res, next) => {
   try {
-    const { storeName, storeGst, storeAddress, storePhone, dashboardBanner, gstSlabs } = req.body;
+    const { 
+      storeName, 
+      storeGst, 
+      storeAddress, 
+      storePhone, 
+      storeEmail,
+      storeTagline,
+      dashboardBanner, 
+      gstSlabs,
+      invoiceSettings
+    } = req.body;
 
     let settings = await StoreSetting.findOne({ tenantId: req.user.tenantId });
     if (!settings) {
@@ -138,8 +148,20 @@ exports.saveStoreSettings = async (req, res, next) => {
     if (storeGst !== undefined) settings.storeGst = storeGst;
     if (storeAddress !== undefined) settings.storeAddress = storeAddress;
     if (storePhone !== undefined) settings.storePhone = storePhone;
+    if (storeEmail !== undefined) settings.storeEmail = storeEmail;
+    if (storeTagline !== undefined) settings.storeTagline = storeTagline;
     if (dashboardBanner !== undefined) settings.dashboardBanner = dashboardBanner;
     if (gstSlabs !== undefined) settings.gstSlabs = gstSlabs;
+    if (invoiceSettings !== undefined) {
+      settings.invoiceSettings = invoiceSettings;
+    }
+    // Always sync storeEmail into invoiceSettings if invoiceSettings has no email or default email
+    if (settings.storeEmail) {
+      if (!settings.invoiceSettings) settings.invoiceSettings = {};
+      if (!settings.invoiceSettings.email || settings.invoiceSettings.email === 'contact@business.com') {
+        settings.invoiceSettings.email = settings.storeEmail;
+      }
+    }
 
     await settings.save();
 

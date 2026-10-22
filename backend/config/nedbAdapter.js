@@ -102,14 +102,15 @@ class QueryBuilder {
 
   async exec() {
     let results;
-    if (this.isSingle) {
+    if (this.isSingle && !this._sort) {
       const doc = await this.store.findOneAsync(this.query);
       results = doc ? [doc] : [];
     } else {
       let cursor = this.store.find(this.query);
       if (this._sort) cursor = cursor.sort(this._sort);
       if (this._skip) cursor = cursor.skip(this._skip);
-      if (this._limit) cursor = cursor.limit(this._limit);
+      if (this.isSingle) cursor = cursor.limit(1);
+      else if (this._limit) cursor = cursor.limit(this._limit);
       results = await cursor.execAsync();
     }
 
@@ -149,8 +150,36 @@ function wrapDocument(doc, store) {
           delete this._isNewPassword;
         }
         this.updatedAt = new Date();
-        await store.updateAsync({ _id: this._id }, this, {});
+        const toSave = { ...this };
+        delete toSave._isNew;
+        delete toSave._isNewPassword;
+        if (this._id) {
+          await store.updateAsync({ _id: this._id }, toSave, {});
+        } else {
+          const inserted = await store.insertAsync(toSave);
+          Object.assign(this, inserted);
+        }
         return this;
+      }
+    });
+  }
+
+  if (!doc.deleteOne) {
+    Object.defineProperty(doc, 'deleteOne', {
+      enumerable: false,
+      writable: true,
+      value: async function () {
+        return await store.removeAsync({ _id: this._id }, {});
+      }
+    });
+  }
+
+  if (!doc.remove) {
+    Object.defineProperty(doc, 'remove', {
+      enumerable: false,
+      writable: true,
+      value: async function () {
+        return await store.removeAsync({ _id: this._id }, {});
       }
     });
   }
@@ -180,7 +209,8 @@ async function populateField(docs, fieldPath, selectFields) {
     subCategory: 'categories',
     cashier: 'users',
     supplier: 'suppliers',
-    tenant: 'tenants'
+    tenant: 'tenants',
+    parent: 'categories'
   };
 
   const targetStoreName = fieldToStoreMap[fieldPath];
@@ -241,11 +271,26 @@ function createModel(collectionName) {
       }
       this.createdAt = this.createdAt || new Date();
       this.updatedAt = new Date();
-      
-      const inserted = await store.insertAsync(this);
-      Object.assign(this, inserted);
-      wrapDocument(this, store);
-      return this;
+
+      if (this._id && !this._isNew) {
+        const toSave = { ...this };
+        delete toSave._isNew;
+        delete toSave._isNewPassword;
+        await store.updateAsync({ _id: this._id }, toSave, {});
+        wrapDocument(this, store);
+        return this;
+      } else {
+        this._isNew = false;
+        delete this._isNewPassword;
+        const toSave = { ...this };
+        delete toSave._isNew;
+        delete toSave._isNewPassword;
+        const inserted = await store.insertAsync(toSave);
+        Object.assign(this, inserted);
+        this._isNew = false;
+        wrapDocument(this, store);
+        return this;
+      }
     }
 
     static find(query = {}) {
@@ -275,11 +320,25 @@ function createModel(collectionName) {
 
     static async findByIdAndUpdate(id, update = {}, options = {}) {
       const strId = id && id.toString ? id.toString() : id;
-      const existing = await store.findOneAsync({ _id: strId });
+      return await this.findOneAndUpdate({ _id: strId }, update, options);
+    }
+
+    static async findByIdAndDelete(id) {
+      const strId = id && id.toString ? id.toString() : id;
+      return await this.findOneAndDelete({ _id: strId });
+    }
+
+    static async findOneAndUpdate(query = {}, update = {}, options = {}) {
+      const sanitized = sanitizeQuery(query);
+      const existing = await store.findOneAsync(sanitized);
       if (!existing) return null;
 
       let updateData = update;
-      if (update.$set) updateData = { ...update.$set };
+      if (update.$set) {
+        updateData = { ...update.$set };
+      } else {
+        updateData = { ...update };
+      }
 
       if (updateData.password) {
         const salt = await bcrypt.genSalt(10);
@@ -287,21 +346,44 @@ function createModel(collectionName) {
       }
 
       updateData.updatedAt = new Date();
-      await store.updateAsync({ _id: strId }, { $set: updateData }, {});
-      const updated = await store.findOneAsync({ _id: strId });
+      Object.keys(updateData).forEach((k) => {
+        if (updateData[k] === undefined) delete updateData[k];
+      });
+
+      await store.updateAsync({ _id: existing._id }, { $set: updateData }, {});
+      const updated = await store.findOneAsync({ _id: existing._id });
       return wrapDocument(updated, store);
     }
 
-    static async findByIdAndDelete(id) {
-      const strId = id && id.toString ? id.toString() : id;
-      const existing = await store.findOneAsync({ _id: strId });
+    static async findOneAndDelete(query = {}) {
+      const sanitized = sanitizeQuery(query);
+      const existing = await store.findOneAsync(sanitized);
       if (!existing) return null;
-      await store.removeAsync({ _id: strId }, {});
+      await store.removeAsync({ _id: existing._id }, {});
       return wrapDocument(existing, store);
+    }
+
+    static async deleteOne(query = {}) {
+      return await store.removeAsync(sanitizeQuery(query), {});
     }
 
     static async deleteMany(query = {}) {
       return await store.removeAsync(sanitizeQuery(query), { multi: true });
+    }
+
+    static async updateOne(query = {}, update = {}) {
+      const sanitized = sanitizeQuery(query);
+      let updateData = update;
+      if (update.$set) {
+        updateData = { ...update.$set };
+      } else {
+        updateData = { ...update };
+      }
+      updateData.updatedAt = new Date();
+      Object.keys(updateData).forEach((k) => {
+        if (updateData[k] === undefined) delete updateData[k];
+      });
+      return await store.updateAsync(sanitized, { $set: updateData }, {});
     }
 
     static async insertMany(items = []) {

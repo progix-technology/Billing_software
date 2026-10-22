@@ -1,16 +1,23 @@
 import React, { useEffect, useState } from 'react';
 import { api } from '../context/AuthContext';
-import { BarChart3, FileSpreadsheet, Calendar, TrendingUp, IndianRupee, ShieldAlert, Award } from 'lucide-react';
+import { BarChart3, FileSpreadsheet, Calendar, TrendingUp, IndianRupee, ShieldAlert, Award, Trash2, RefreshCw } from 'lucide-react';
 
 const Reports = () => {
   const [gstSummary, setGstSummary] = useState([]);
-  const [profitLoss, setProfitLoss] = useState(null);
+  const [profitLoss, setProfitLoss] = useState({
+    totalRevenue: 0,
+    totalCogs: 0,
+    totalDiscountGiven: 0,
+    grossProfit: 0,
+    netProfit: 0,
+  });
   const [loading, setLoading] = useState(true);
+  const [clearing, setClearing] = useState(false);
 
-  // Date filters
+  // Date filters: default to current month / today
   const [startDate, setStartDate] = useState(() => {
     const d = new Date();
-    d.setDate(d.getDate() - 30);
+    d.setDate(1); // 1st of current month
     return d.toISOString().split('T')[0];
   });
   const [endDate, setEndDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -20,11 +27,25 @@ const Reports = () => {
     try {
       // Fetch GST reports
       const gstRes = await api.get('/api/reports/gst', { params: { startDate, endDate } });
+      if (gstRes.data && gstRes.data.success && Array.isArray(gstRes.data.taxSummary)) {
+        setGstSummary(gstRes.data.taxSummary);
+      } else {
+        setGstSummary([]);
+      }
+
       // Fetch profit & loss reports
       const plRes = await api.get('/api/reports/profit-loss', { params: { startDate, endDate } });
-
-      if (gstRes.data.success) setGstSummary(gstRes.data.taxSummary);
-      if (plRes.data.success) setProfitLoss(plRes.data.report);
+      if (plRes.data && plRes.data.success && plRes.data.report) {
+        setProfitLoss(plRes.data.report);
+      } else {
+        setProfitLoss({
+          totalRevenue: 0,
+          totalCogs: 0,
+          totalDiscountGiven: 0,
+          grossProfit: 0,
+          netProfit: 0,
+        });
+      }
     } catch (err) {
       console.error('Failed to compile reports', err);
     } finally {
@@ -35,6 +56,22 @@ const Reports = () => {
   useEffect(() => {
     fetchReportData();
   }, [startDate, endDate]);
+
+  const handleClearOldReports = async () => {
+    if (!window.confirm('Kya aap purani dummy / test reports ko permanently hatana chahte hain?')) return;
+    setClearing(true);
+    try {
+      const res = await api.delete('/api/reports/clear-old');
+      if (res.data.success) {
+        alert('Purani test reports successfully hata di gayi hain!');
+        fetchReportData();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || 'Purani reports hatane me dikkat aayi');
+    } finally {
+      setClearing(false);
+    }
+  };
 
   const handleExportSales = async () => {
     try {
@@ -71,10 +108,12 @@ const Reports = () => {
     }
   };
 
+  const fmt = (n) => (Number(n) || 0).toFixed(2);
+
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="flex justify-between items-center bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white dark:bg-slate-900 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800 transition-colors">
         <div>
           <h2 className="text-xl font-bold text-slate-900 dark:text-white flex items-center gap-2">
             <BarChart3 className="h-6 w-6 text-primary-500" />
@@ -85,22 +124,35 @@ const Reports = () => {
           </p>
         </div>
 
-        {/* Date filters */}
-        <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-950 px-4 py-2 border border-slate-200 dark:border-slate-850 rounded-xl">
-          <Calendar className="h-4 w-4 text-slate-400" />
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => setStartDate(e.target.value)}
-            className="bg-transparent border-0 focus:outline-none font-semibold text-slate-800 dark:text-slate-200"
-          />
-          <span>to</span>
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => setEndDate(e.target.value)}
-            className="bg-transparent border-0 focus:outline-none font-semibold text-slate-800 dark:text-slate-200"
-          />
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Date filters */}
+          <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 dark:bg-slate-950 px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl">
+            <Calendar className="h-4 w-4 text-slate-400" />
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => setStartDate(e.target.value)}
+              className="bg-transparent border-0 focus:outline-none font-semibold text-slate-800 dark:text-slate-200"
+            />
+            <span>to</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => setEndDate(e.target.value)}
+              className="bg-transparent border-0 focus:outline-none font-semibold text-slate-800 dark:text-slate-200"
+            />
+          </div>
+
+          {/* Clear Old Data Button */}
+          <button
+            onClick={handleClearOldReports}
+            disabled={clearing}
+            title="Purani dummy test reports delete karein"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-red-600 hover:text-white hover:bg-red-600 border border-red-200 dark:border-red-900/50 rounded-xl transition-all"
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+            {clearing ? 'Clearing...' : 'Clear Old Test Data'}
+          </button>
         </div>
       </div>
 
@@ -116,7 +168,7 @@ const Reports = () => {
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Gross Revenue</span>
               <div className="flex items-baseline justify-between">
-                <p className="text-2xl font-black text-slate-900 dark:text-white">₹{profitLoss?.totalRevenue.toFixed(2)}</p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white">₹{fmt(profitLoss?.totalRevenue)}</p>
                 <TrendingUp className="h-4.5 w-4.5 text-emerald-500" />
               </div>
             </div>
@@ -124,22 +176,21 @@ const Reports = () => {
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Cost of Goods Sold (COGS)</span>
               <div className="flex items-baseline justify-between">
-                <p className="text-2xl font-black text-slate-700 dark:text-slate-300">₹{profitLoss?.totalCogs.toFixed(2)}</p>
+                <p className="text-2xl font-black text-slate-700 dark:text-slate-300">₹{fmt(profitLoss?.totalCogs)}</p>
                 <span className="text-xs text-slate-400 font-semibold">Purchase value</span>
               </div>
             </div>
-
 
             <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 rounded-2xl shadow-sm">
               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">Net Clean Profit</span>
               <div className="flex items-baseline justify-between">
                 <p className={`text-2xl font-black ${
-                  profitLoss?.netProfit >= 0 ? 'text-emerald-500' : 'text-red-500'
+                  (profitLoss?.netProfit || 0) >= 0 ? 'text-emerald-500' : 'text-red-500'
                 }`}>
-                  ₹{profitLoss?.netProfit.toFixed(2)}
+                  ₹{fmt(profitLoss?.netProfit)}
                 </p>
                 <Award className={`h-5 w-5 ${
-                  profitLoss?.netProfit >= 0 ? 'text-emerald-500 animate-bounce' : 'text-red-500'
+                  (profitLoss?.netProfit || 0) >= 0 ? 'text-emerald-500 animate-bounce' : 'text-red-500'
                 }`} />
               </div>
             </div>
@@ -171,11 +222,11 @@ const Reports = () => {
                       {gstSummary.map((slab) => (
                         <tr key={slab._id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/10">
                           <td className="py-3 px-4 font-bold text-slate-900 dark:text-white">{slab._id}% Slab</td>
-                          <td className="py-3 px-4 text-right">₹{slab.taxableValue.toFixed(2)}</td>
-                          <td className="py-3 px-4 text-right">₹{slab.cgst.toFixed(2)}</td>
-                          <td className="py-3 px-4 text-right">₹{slab.sgst.toFixed(2)}</td>
-                          <td className="py-3 px-4 text-right">₹{slab.igst.toFixed(2)}</td>
-                          <td className="py-3 px-4 text-right font-bold text-primary-500">₹{slab.totalTax.toFixed(2)}</td>
+                          <td className="py-3 px-4 text-right">₹{fmt(slab.taxableValue)}</td>
+                          <td className="py-3 px-4 text-right">₹{fmt(slab.cgst)}</td>
+                          <td className="py-3 px-4 text-right">₹{fmt(slab.sgst)}</td>
+                          <td className="py-3 px-4 text-right">₹{fmt(slab.igst)}</td>
+                          <td className="py-3 px-4 text-right font-bold text-primary-500">₹{fmt(slab.totalTax)}</td>
                         </tr>
                       ))}
                     </tbody>

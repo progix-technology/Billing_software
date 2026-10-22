@@ -1,10 +1,12 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import useSessionStorage from '../hooks/useSessionStorage';
-import { Calculator, Search, Trash2, CreditCard, ChevronRight, UserPlus, X, Printer, Download, CheckCircle, Camera, Key, Copy, Check, PhoneCall, AlertTriangle } from 'lucide-react';
+import { Calculator, Search, Trash2, CreditCard, ChevronRight, UserPlus, X, Printer, Download, CheckCircle, Camera, Key, Copy, Check, PhoneCall, AlertTriangle, Zap, Loader2 } from 'lucide-react';
 import CameraScanner from '../components/CameraScanner';
+import InvoiceTemplate from '../components/InvoiceTemplate';
+import { printInvoiceElement, downloadInvoicePDF } from '../utils/printHelper';
 
 const Billing = () => {
   const { settings } = useSettings();
@@ -12,9 +14,9 @@ const Billing = () => {
   const [products, setProducts] = useState([]);
   const [customers, setCustomers] = useState([]);
 
-  // Search & Cart states
-  const [productSearch, setProductSearch] = useSessionStorage('billing_productSearch', '');
-  const [customerSearch, setCustomerSearch] = useSessionStorage('billing_customerSearch', '');
+  // Search & Cart states - regular state for high-performance zero-lag typing
+  const [productSearch, setProductSearch] = useState('');
+  const [customerSearch, setCustomerSearch] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useSessionStorage('billing_selectedCustomer', null);
   const [cart, setCart] = useSessionStorage('billing_cart', []);
 
@@ -22,7 +24,23 @@ const Billing = () => {
   const [isInterstate, setIsInterstate] = useSessionStorage('billing_isInterstate', false);
   const [paymentMethod, setPaymentMethod] = useSessionStorage('billing_paymentMethod', 'CASH');
   const [paidAmount, setPaidAmount] = useSessionStorage('billing_paidAmount', '');
-  const [remarks, setRemarks] = useSessionStorage('billing_remarks', '');
+  const [remarks, setRemarks] = useState(() => {
+    try {
+      const item = sessionStorage.getItem('billing_remarks');
+      return item ? JSON.parse(item) : '';
+    } catch {
+      return '';
+    }
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      try {
+        sessionStorage.setItem('billing_remarks', JSON.stringify(remarks));
+      } catch {}
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [remarks]);
 
   // Inline New Customer states
   const [showCustModal, setShowCustModal] = useState(false);
@@ -31,12 +49,20 @@ const Billing = () => {
   const [newCustGst, setNewCustGst] = useState('');
   const [newCustAddress, setNewCustAddress] = useState('');
   const [custError, setCustError] = useState('');
+  const [isCustSubmitting, setIsCustSubmitting] = useState(false);
 
   // Post Checkout Preview Modal
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [createdInvoice, setCreatedInvoice] = useState(null);
-  const [printLayout, setPrintLayout] = useState('A4'); // A4 or THERMAL
+  const [printLayout, setPrintLayout] = useState('A4'); // 'A4' | 'A5' | 'thermal'
+  const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [showScanner, setShowScanner] = useState(false);
+
+  useEffect(() => {
+    if (settings?.invoiceSettings?.layout) {
+      setPrintLayout(settings.invoiceSettings.layout);
+    }
+  }, [settings?.invoiceSettings?.layout]);
 
   // License & Subscription Lock States
   const [licenseStatus, setLicenseStatus] = useState(null);
@@ -70,7 +96,8 @@ const Billing = () => {
     try {
       const res = await api.post('/api/license/activate', { licenseKey: licenseKeyInput.trim() });
       if (res.data.success) {
-        setLicenseMsg({ type: 'success', text: `Subscription active! Plan: ${res.data.planName}` });
+        const planText = res.data.planName || 'Active';
+        setLicenseMsg({ type: 'success', text: res.data.message || `Subscription active! Plan: ${planText}` });
         setLicenseKeyInput('');
         await fetchLicense();
         setTimeout(() => setShowLicenseModal(false), 1500);
@@ -156,25 +183,35 @@ const Billing = () => {
     ));
   };
 
+  const updateGstRate = (productId, rate) => {
+    const val = parseFloat(rate);
+    const safeRate = isNaN(val) ? 0 : Math.max(0, val);
+    setCart(cart.map(item =>
+      item.product._id === productId
+        ? { ...item, gstPercentage: safeRate }
+        : item
+    ));
+  };
+
   const removeFromCart = (productId) => {
     setCart(cart.filter(item => item.product._id !== productId));
   };
 
-  // Calculation helpers
-  const calculateCartDetails = () => {
+  // Memoized Calculation helpers - prevents heavy recalculations on keystroke
+  const { items: calculatedItems, subTotal, totalDiscount, totalGst, grandTotal } = useMemo(() => {
     let subTotal = 0;
     let totalDiscount = 0;
     let totalGst = 0;
 
     const itemsCalculated = cart.map(item => {
-      const unitPrice = item.product.sellingPrice;
-      const quantity = item.quantity;
+      const unitPrice = item.product?.sellingPrice || 0;
+      const quantity = item.quantity || 1;
       const gross = unitPrice * quantity;
 
-      const discAmt = (gross * item.discountPercentage) / 100;
+      const discAmt = (gross * (item.discountPercentage || 0)) / 100;
       const taxable = gross - discAmt;
 
-      const gstRate = item.product.gstPercentage;
+      const gstRate = item.gstPercentage !== undefined ? item.gstPercentage : (item.product?.gstPercentage || 0);
       const gstAmt = (taxable * gstRate) / 100;
 
       const total = taxable + gstAmt;
@@ -202,9 +239,7 @@ const Billing = () => {
       totalGst,
       grandTotal
     };
-  };
-
-  const { items: calculatedItems, subTotal, totalDiscount, totalGst, grandTotal } = calculateCartDetails();
+  }, [cart]);
 
   // Auto-fill paid amount when cart grandTotal changes
   useEffect(() => {
@@ -218,14 +253,23 @@ const Billing = () => {
   // Create Customer Inline
   const handleCreateCustomer = async (e) => {
     e.preventDefault();
-    if (!newCustName.trim() || !newCustPhone.trim()) return;
+    if (!newCustName.trim()) {
+      alert('Please enter Customer Name');
+      return;
+    }
+    if (!newCustPhone.trim()) {
+      alert('Please enter Customer Mobile / Phone number');
+      return;
+    }
 
+    setIsCustSubmitting(true);
+    setCustError('');
     try {
       const res = await api.post('/api/customers', {
-        name: newCustName,
-        phone: newCustPhone,
-        gstNumber: newCustGst,
-        address: newCustAddress,
+        name: newCustName.trim(),
+        phone: newCustPhone.trim(),
+        gstNumber: newCustGst.trim().toUpperCase(),
+        address: newCustAddress.trim(),
       });
 
       if (res.data.success) {
@@ -236,9 +280,14 @@ const Billing = () => {
         setNewCustPhone('');
         setNewCustGst('');
         setNewCustAddress('');
+        alert('Customer registered and selected successfully!');
       }
     } catch (err) {
-      setCustError(err.response?.data?.message || 'Failed to register customer');
+      const errMsg = err.response?.data?.message || err.message || 'Failed to register customer';
+      setCustError(errMsg);
+      alert('Error: ' + errMsg);
+    } finally {
+      setIsCustSubmitting(false);
     }
   };
 
@@ -249,19 +298,20 @@ const Billing = () => {
       return;
     }
 
-    if (!selectedCustomer) {
-      return alert('Please select a Customer for this invoice.');
-    }
     if (cart.length === 0) {
-      return alert('Checkout cart is empty.');
+      return alert('Checkout cart is empty. Please add items to checkout.');
     }
 
+    // Default to walk-in if no customer is selected
+    const custId = selectedCustomer ? selectedCustomer._id : 'walk-in';
+
     const payload = {
-      customerId: selectedCustomer._id,
+      customerId: custId,
       items: cart.map(item => ({
         productId: item.product._id,
         quantity: item.quantity,
         discountPercentage: item.discountPercentage,
+        gstPercentage: item.gstPercentage !== undefined ? item.gstPercentage : item.product.gstPercentage,
         isInterstate
       })),
       paidAmount: paidAmount === '' ? grandTotal : parseFloat(paidAmount),
@@ -289,78 +339,42 @@ const Billing = () => {
   };
 
   const handleDownloadPDF = async () => {
-    if (!createdInvoice) return;
+    if (!createdInvoice || !printAreaRef.current) return;
+    setIsDownloadingPdf(true);
     try {
-      const response = await api.get(`/api/invoices/${createdInvoice._id}/pdf`, {
-        responseType: 'blob'
-      });
-      const file = new Blob([response.data], { type: 'application/pdf' });
-      const fileURL = URL.createObjectURL(file);
-      const link = document.createElement('a');
-      link.href = fileURL;
-      link.setAttribute('download', `Invoice-${createdInvoice.invoiceNumber}.pdf`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
+      await downloadInvoicePDF(printAreaRef, createdInvoice.invoiceNumber, printLayout);
     } catch (err) {
       console.error(err);
-      alert('Failed to generate PDF download');
+      alert('Failed to generate styled PDF download: ' + (err.message || 'Unknown error'));
+    } finally {
+      setIsDownloadingPdf(false);
     }
   };
 
   const triggerBrowserPrint = () => {
-    const printContent = printAreaRef.current.innerHTML;
-    const originalContent = document.body.innerHTML;
-
-    // Create printable body frame
-    document.body.innerHTML = `
-      <html>
-        <head>
-          <title>Print Invoice</title>
-          <style>
-            body { font-family: sans-serif; padding: 20px; color: #000; background: #fff; }
-            table { width: 100%; border-collapse: collapse; margin-top: 15px; }
-            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 12px; }
-            th { background-color: #f2f2f2; }
-            .totals { float: right; width: 250px; margin-top: 20px; font-size: 12px; }
-            .totals div { display: flex; justify-content: space-between; padding: 4px 0; }
-            .header-info { display: flex; justify-content: space-between; font-size: 12px; line-height: 1.6; }
-            .title { text-align: center; font-size: 20px; font-weight: bold; margin-bottom: 2px; }
-            .subtitle { text-align: center; font-size: 10px; color: #555; margin-bottom: 20px; }
-            /* Thermal Specific styles */
-            .thermal { width: 80mm; margin: 0 auto; padding: 5px; font-family: 'Courier New', Courier, monospace; font-size: 11px; }
-            .thermal table, .thermal th, .thermal td { border: none; border-bottom: 1px dashed #000; padding: 4px 2px; font-size: 10px; }
-            .thermal th { background: none; }
-            .thermal .title { font-size: 14px; }
-            .thermal .totals { float: none; width: 100%; }
-          </style>
-        </head>
-        <body>
-          <div>${printContent}</div>
-        </body>
-      </html>
-    `;
-    window.print();
-    document.body.innerHTML = originalContent;
-    window.location.reload(); // Reload context state
+    printInvoiceElement(printAreaRef, `Invoice-${createdInvoice?.invoiceNumber || 'Receipt'}`, printLayout);
   };
 
-  // Search product suggestions
-  const productSuggestions = productSearch.trim()
-    ? products.filter(p =>
-      p.name.toLowerCase().includes(productSearch.toLowerCase()) ||
-      p.sku.toLowerCase().includes(productSearch.toLowerCase()) ||
-      (p.barcode && p.barcode.includes(productSearch))
-    ).slice(0, 5)
-    : [];
+  // Memoized product suggestions - instant search response
+  const productSuggestions = useMemo(() => {
+    if (!productSearch.trim()) return [];
+    const query = productSearch.toLowerCase().trim();
+    return products.filter(p =>
+      (p.name && p.name.toLowerCase().includes(query)) ||
+      (p.sku && p.sku.toLowerCase().includes(query)) ||
+      (p.barcode && p.barcode.includes(query))
+    ).slice(0, 5);
+  }, [products, productSearch]);
 
-  // Search customer suggestions
-  const customerSuggestions = customerSearch.trim()
-    ? customers.filter(c =>
-      c.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
-      c.phone.includes(customerSearch)
-    ).slice(0, 5)
-    : [];
+  // Memoized customer suggestions
+  const customerSuggestions = useMemo(() => {
+    if (!customerSearch.trim()) return [];
+    const query = customerSearch.toLowerCase().trim();
+    return customers.filter(c =>
+      (c.name && c.name.toLowerCase().includes(query)) ||
+      (c.phone && c.phone.includes(query))
+    ).slice(0, 5);
+  }, [customers, customerSearch]);
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-auto lg:h-[calc(100vh-120px)] pb-6 lg:pb-0">
@@ -397,8 +411,21 @@ const Billing = () => {
                   }
                 }
               }}
-              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 pl-9 pr-4 text-sm focus:outline-none focus:border-primary-500 text-slate-800 dark:text-slate-200"
+              className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 pl-9 pr-9 text-sm focus:outline-none focus:border-primary-500 text-slate-800 dark:text-slate-200"
             />
+            {selectedCustomer && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCustomer(null);
+                  setCustomerSearch('');
+                }}
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 dark:hover:text-white"
+                title="Clear selected customer"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            )}
             {/* Customer suggestion lists */}
             {customerSuggestions.length > 0 && !selectedCustomer && (
               <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-30 max-h-40 overflow-y-auto">
@@ -416,12 +443,28 @@ const Billing = () => {
             )}
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setShowCustModal(true)}
-              className="flex items-center gap-1 text-xs font-semibold px-3 py-2 bg-primary-500/10 text-primary-400 rounded-xl hover:bg-primary-500/20 transition-all"
+              type="button"
+              onClick={() => {
+                setSelectedCustomer({ _id: 'walk-in', name: 'Walk-in Customer', phone: 'Cash Sale' });
+                setCustomerSearch('');
+              }}
+              className={`flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-xl transition-all border ${selectedCustomer?._id === 'walk-in'
+                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-md'
+                  : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 border-emerald-500/20'
+                }`}
+              title="Fast checkout for retail cash customers without saving profile"
             >
-              <UserPlus className="h-4 w-4" /> Register Walk-in
+              <Zap className="h-3.5 w-3.5" /> Walk-in (Cash)
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setShowCustModal(true)}
+              className="flex items-center gap-1 text-xs font-semibold px-3 py-2 bg-primary-500/10 text-primary-400 rounded-xl hover:bg-primary-500/20 transition-all border border-primary-500/20"
+            >
+              <UserPlus className="h-4 w-4" /> Register Client
             </button>
 
             {/* Interstate flag */}
@@ -454,41 +497,41 @@ const Billing = () => {
                   placeholder="Scan Barcode or Search product..."
                   value={productSearch}
                   onChange={(e) => setProductSearch(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    e.preventDefault();
-                    // Match exact barcode first
-                    const exactMatch = products.find(p => p.barcode && p.barcode === productSearch.trim());
-                    if (exactMatch) {
-                      addToCart(exactMatch);
-                      setProductSearch('');
-                    } else if (productSuggestions.length === 1) {
-                      // Fallback to single suggestion match
-                      addToCart(productSuggestions[0]);
-                      setProductSearch('');
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      // Match exact barcode first
+                      const exactMatch = products.find(p => p.barcode && p.barcode === productSearch.trim());
+                      if (exactMatch) {
+                        addToCart(exactMatch);
+                        setProductSearch('');
+                      } else if (productSuggestions.length === 1) {
+                        // Fallback to single suggestion match
+                        addToCart(productSuggestions[0]);
+                        setProductSearch('');
+                      }
                     }
-                  }
-                }}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 pl-9 pr-4 text-xs focus:outline-none focus:border-primary-500 text-slate-800 dark:text-slate-200"
-              />
-              {/* Product suggestions list */}
-              {productSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-30 max-h-48 overflow-y-auto">
-                  {productSuggestions.map(p => (
-                    <button
-                      key={p._id}
-                      onClick={() => addToCart(p)}
-                      className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs flex justify-between items-center"
-                    >
-                      <div>
-                        <p className="font-bold">{p.name}</p>
-                        <p className="text-[10px] text-slate-400 font-mono">SKU: {p.sku} | Stock: {p.stockQuantity}</p>
-                      </div>
-                      <span className="font-bold text-primary-500">₹{p.sellingPrice.toFixed(2)}</span>
-                    </button>
-                  ))}
-                </div>
-              )}
+                  }}
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 pl-9 pr-4 text-xs focus:outline-none focus:border-primary-500 text-slate-800 dark:text-slate-200"
+                />
+                {/* Product suggestions list */}
+                {productSuggestions.length > 0 && (
+                  <div className="absolute left-0 right-0 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-lg z-30 max-h-48 overflow-y-auto">
+                    {productSuggestions.map(p => (
+                      <button
+                        key={p._id}
+                        onClick={() => addToCart(p)}
+                        className="w-full text-left px-4 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 text-xs flex justify-between items-center"
+                      >
+                        <div>
+                          <p className="font-bold">{p.name}</p>
+                          <p className="text-[10px] text-slate-400 font-mono">SKU: {p.sku} | Stock: {p.stockQuantity}</p>
+                        </div>
+                        <span className="font-bold text-primary-500">₹{p.sellingPrice.toFixed(2)}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               <button
                 onClick={() => {
@@ -558,7 +601,20 @@ const Billing = () => {
                             className="w-12 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded p-1 text-center"
                           />
                         </td>
-                        <td className="py-3 px-4 text-center font-semibold">{product.gstPercentage}%</td>
+                        <td className="py-3 px-4 text-center">
+                          <div className="inline-flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              max="100"
+                              step="0.5"
+                              value={item.gstPercentage !== undefined ? item.gstPercentage : product.gstPercentage}
+                              onChange={(e) => updateGstRate(product._id, e.target.value)}
+                              className="w-14 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded px-1.5 py-1 text-center font-bold text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-primary-500"
+                            />
+                            <span className="text-xs font-semibold text-slate-400">%</span>
+                          </div>
+                        </td>
                         <td className="py-3 px-4 text-right text-[10px] text-slate-400">
                           {isInterstate ? (
                             <span>IGST: ₹{item.gstAmt.toFixed(1)}</span>
@@ -656,13 +712,13 @@ const Billing = () => {
 
             {/* Remarks */}
             <div>
-              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Bill Remarks</label>
-              <input
-                type="text"
+              <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1.5">Bill Remarks (Text Area)</label>
+              <textarea
+                rows={2}
                 placeholder="Voucher reference / special notes..."
                 value={remarks}
                 onChange={(e) => setRemarks(e.target.value)}
-                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-sm focus:outline-none"
+                className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 text-sm focus:outline-none text-slate-900 dark:text-white"
               />
             </div>
           </div>
@@ -680,7 +736,7 @@ const Billing = () => {
 
       {/* New Customer Registration Dialog */}
       {showCustModal && createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-40 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transition-colors duration-300">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
               <h3 className="font-bold text-slate-900 dark:text-white">Register Walk-in Client</h3>
@@ -698,11 +754,12 @@ const Billing = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
-                  Customer Name
+                  Customer Name *
                 </label>
                 <input
                   type="text"
                   required
+                  autoFocus
                   value={newCustName}
                   onChange={(e) => setNewCustName(e.target.value)}
                   placeholder="e.g. Anand Sharma"
@@ -712,7 +769,7 @@ const Billing = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
-                  Phone Number
+                  Phone Number *
                 </label>
                 <input
                   type="text"
@@ -739,13 +796,13 @@ const Billing = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
-                  Address
+                  Address (Text Area)
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={newCustAddress}
                   onChange={(e) => setNewCustAddress(e.target.value)}
-                  placeholder="City, State"
+                  placeholder="City, State, Pin Code"
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 focus:outline-none focus:border-primary-500 text-sm text-slate-900 dark:text-white"
                 />
               </div>
@@ -753,16 +810,19 @@ const Billing = () => {
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
+                  disabled={isCustSubmitting}
                   onClick={() => setShowCustModal(false)}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold"
+                  disabled={isCustSubmitting}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  Register Client
+                  {isCustSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <span>{isCustSubmitting ? 'Registering...' : 'Register Client'}</span>
                 </button>
               </div>
             </form>
@@ -774,7 +834,7 @@ const Billing = () => {
       {/* Bill Checkout Preview & Printer Dialog */}
       {showPreviewModal && createdInvoice && createPortal(
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-40 animate-fade-in overflow-y-auto">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-3xl shadow-2xl overflow-hidden transition-colors duration-300 my-8">
+          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden transition-colors duration-300 my-8">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex flex-wrap justify-between items-center bg-slate-50 dark:bg-slate-950/40 gap-4">
               <div className="flex items-center gap-2">
                 <div className="h-8 w-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
@@ -787,19 +847,38 @@ const Billing = () => {
               </div>
 
               <div className="flex items-center gap-2">
-                {/* Print Layout Toggle */}
+                {/* Print Layout Toggle - 3 layout options matching Settings */}
                 <div className="flex bg-slate-200 dark:bg-slate-800 rounded-xl p-1 text-xs">
                   <button
+                    type="button"
                     onClick={() => setPrintLayout('A4')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${printLayout === 'A4' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'
-                      }`}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                      printLayout === 'A4'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
                   >
                     A4 Invoice
                   </button>
                   <button
-                    onClick={() => setPrintLayout('THERMAL')}
-                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${printLayout === 'THERMAL' ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm' : 'text-slate-500'
-                      }`}
+                    type="button"
+                    onClick={() => setPrintLayout('A5')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                      printLayout === 'A5'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
+                  >
+                    A5 Invoice
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPrintLayout('thermal')}
+                    className={`px-3 py-1.5 rounded-lg font-bold transition-all ${
+                      printLayout === 'thermal'
+                        ? 'bg-white dark:bg-slate-900 text-slate-900 dark:text-white shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 dark:hover:text-white'
+                    }`}
                   >
                     80mm Thermal
                   </button>
@@ -807,16 +886,22 @@ const Billing = () => {
 
                 <button
                   onClick={triggerBrowserPrint}
-                  className="flex items-center gap-1 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white px-3 py-1.5 rounded-xl text-xs font-semibold"
+                  className="flex items-center gap-1.5 bg-slate-900 dark:bg-slate-800 hover:bg-slate-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm"
                 >
                   <Printer className="h-3.5 w-3.5" /> Print
                 </button>
 
                 <button
                   onClick={handleDownloadPDF}
-                  className="flex items-center gap-1 bg-primary-600 hover:bg-primary-500 text-white px-3 py-1.5 rounded-xl text-xs font-semibold"
+                  disabled={isDownloadingPdf}
+                  className="flex items-center gap-1.5 bg-primary-600 hover:bg-primary-500 text-white px-3.5 py-1.5 rounded-xl text-xs font-semibold transition-all shadow-sm disabled:opacity-60"
                 >
-                  <Download className="h-3.5 w-3.5" /> Download PDF
+                  {isDownloadingPdf ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Download className="h-3.5 w-3.5" />
+                  )}
+                  {isDownloadingPdf ? 'Downloading...' : 'Download PDF'}
                 </button>
 
                 <button onClick={() => setShowPreviewModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
@@ -826,160 +911,17 @@ const Billing = () => {
             </div>
 
             {/* Scrollable print template canvas */}
-            <div className="p-6 max-h-[60vh] overflow-y-auto bg-slate-50 dark:bg-slate-950 flex justify-center border-b border-slate-100 dark:border-slate-800">
-              <div ref={printAreaRef} className="bg-white text-slate-900 p-6 shadow-md rounded border border-slate-200/50 w-full max-w-[650px]">
-
-                {/* Print Layout A4 */}
-                {printLayout === 'A4' ? (
-                  <div className="space-y-6">
-                    {/* Header */}
-                    <div>
-                      <div className="text-center font-bold text-xl uppercase tracking-wider text-slate-950">{settings?.storeName || 'Enterprise Billing Solutions'}</div>
-                      <div className="text-center text-[10px] text-slate-500">GSTIN: {settings?.storeGst || 'N/A'} | Address: {settings?.storeAddress || 'N/A'}</div>
-                    </div>
-
-                    <hr className="border-slate-200" />
-
-                    {/* Meta section */}
-                    <div className="flex justify-between text-xs text-slate-700 leading-relaxed">
-                      <div>
-                        <span className="font-bold block text-slate-950">Invoice Metadata:</span>
-                        <p>Number: <span className="font-bold font-mono text-slate-950">{createdInvoice.invoiceNumber}</span></p>
-                        <p>Date: {new Date(createdInvoice.createdAt).toLocaleDateString()}</p>
-                        <p>Payment: {createdInvoice.paymentMethod} ({createdInvoice.status})</p>
-                      </div>
-                      <div>
-                        <span className="font-bold block text-slate-950">Bill To:</span>
-                        <p>Customer: <span className="font-bold text-slate-950">{selectedCustomer?.name}</span></p>
-                        <p>Phone: {selectedCustomer?.phone}</p>
-                        {selectedCustomer?.gstNumber && <p>GSTIN: <span className="font-mono">{selectedCustomer.gstNumber}</span></p>}
-                      </div>
-                    </div>
-
-                    {/* Table */}
-                    <table className="w-full text-[11px] text-left border-collapse border border-slate-200">
-                      <thead>
-                        <tr className="bg-slate-100 text-slate-800 border-b border-slate-200">
-                          <th className="p-2 border border-slate-200">Description</th>
-                          <th className="p-2 border border-slate-200 text-right">Price</th>
-                          <th className="p-2 border border-slate-200 text-center">Qty</th>
-                          <th className="p-2 border border-slate-200 text-right">Disc %</th>
-                          <th className="p-2 border border-slate-200 text-center">GST %</th>
-                          <th className="p-2 border border-slate-200 text-right">Total</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {createdInvoice.items.map((item) => (
-                          <tr key={item._id} className="border-b border-slate-200">
-                            <td className="p-2 border border-slate-200 font-bold">{item.name}</td>
-                            <td className="p-2 border border-slate-200 text-right">₹{item.unitPrice.toFixed(2)}</td>
-                            <td className="p-2 border border-slate-200 text-center">{item.quantity}</td>
-                            <td className="p-2 border border-slate-200 text-right">{item.discountPercentage}%</td>
-                            <td className="p-2 border border-slate-200 text-center">{item.gstPercentage}%</td>
-                            <td className="p-2 border border-slate-200 text-right font-bold">₹{item.total.toFixed(2)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    {/* Summary Total details */}
-                    <div className="flex justify-end text-xs">
-                      <div className="w-64 space-y-2 border border-slate-200 p-3 rounded bg-slate-50">
-                        <div className="flex justify-between">
-                          <span>Subtotal:</span>
-                          <span>₹{createdInvoice.subTotal.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between text-red-600">
-                          <span>Discount:</span>
-                          <span>-₹{createdInvoice.totalDiscount.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span>GST Tax:</span>
-                          <span>₹{createdInvoice.totalGst.toFixed(2)}</span>
-                        </div>
-                        <hr className="border-slate-300" />
-                        <div className="flex justify-between font-bold text-slate-950 text-sm">
-                          <span>Grand Total:</span>
-                          <span>₹{createdInvoice.grandTotal.toFixed(2)}</span>
-                        </div>
-                        <div className="flex justify-between pt-1 text-[11px] text-slate-500">
-                          <span>Paid Amount:</span>
-                          <span>₹{createdInvoice.paidAmount.toFixed(2)}</span>
-                        </div>
-                        {createdInvoice.balanceAmount > 0 && (
-                          <div className="flex justify-between text-red-500 font-semibold text-[11px]">
-                            <span>Due Balance:</span>
-                            <span>₹{createdInvoice.balanceAmount.toFixed(2)}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  /* Thermal Layout (80mm) */
-                  <div className="thermal font-mono leading-tight max-w-[280px] mx-auto text-slate-950 text-xs">
-                    <div className="text-center font-bold uppercase text-sm">{settings?.storeName || 'Enterprise POS'}</div>
-                    <div className="text-center text-[9px] text-slate-600 mb-4">GST: {settings?.storeGst || 'N/A'} | {settings?.storeAddress || 'N/A'}</div>
-
-                    <div className="border-b border-dashed border-slate-400 pb-2 mb-2">
-                      <p>BILL: {createdInvoice.invoiceNumber}</p>
-                      <p>DATE: {new Date(createdInvoice.createdAt).toLocaleString()}</p>
-                      <p>CUST: {selectedCustomer?.name}</p>
-                      <p>PHONE: {selectedCustomer?.phone}</p>
-                    </div>
-
-                    <table className="w-full mb-2">
-                      <thead>
-                        <tr className="border-b border-dashed border-slate-400 text-left font-bold text-[10px]">
-                          <th className="py-1">ITEM</th>
-                          <th className="py-1 text-center">QTY</th>
-                          <th className="py-1 text-right">TOTAL</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {createdInvoice.items.map((item) => (
-                          <tr key={item._id} className="text-[10px]">
-                            <td className="py-1">{item.name}</td>
-                            <td className="py-1 text-center">{item.quantity}</td>
-                            <td className="py-1 text-right font-bold">₹{item.total.toFixed(0)}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-
-                    <div className="border-t border-dashed border-slate-400 pt-2 space-y-1 text-[10px]">
-                      <div className="flex justify-between">
-                        <span>SUBTOTAL:</span>
-                        <span>₹{createdInvoice.subTotal.toFixed(0)}</span>
-                      </div>
-                      <div className="flex justify-between text-red-600">
-                        <span>DISCOUNT:</span>
-                        <span>-₹{createdInvoice.totalDiscount.toFixed(0)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>GST TAX:</span>
-                        <span>₹{createdInvoice.totalGst.toFixed(0)}</span>
-                      </div>
-                      <div className="flex justify-between font-bold text-sm border-t border-dashed border-slate-400 pt-1">
-                        <span>TOTAL:</span>
-                        <span>₹{createdInvoice.grandTotal.toFixed(0)}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>PAID:</span>
-                        <span>₹{createdInvoice.paidAmount.toFixed(0)}</span>
-                      </div>
-                      {createdInvoice.balanceAmount > 0 && (
-                        <div className="flex justify-between font-bold text-red-500">
-                          <span>DUE:</span>
-                          <span>₹{createdInvoice.balanceAmount.toFixed(0)}</span>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="text-center text-[9px] mt-6 border-t border-dashed border-slate-400 pt-2">
-                      *** Thank You! Visit Again ***
-                    </div>
-                  </div>
+            <div className="p-4 max-h-[75vh] overflow-x-auto overflow-y-auto bg-slate-100 dark:bg-slate-950 flex justify-center border-b border-slate-100 dark:border-slate-800">
+              <div ref={printAreaRef} className="w-full flex justify-center" style={{ minWidth: 'min-content' }}>
+                {createdInvoice && (
+                  <InvoiceTemplate
+                    invoice={{
+                      ...createdInvoice,
+                      customer: selectedCustomer || createdInvoice.customer,
+                    }}
+                    settings={settings}
+                    layout={printLayout}
+                  />
                 )}
               </div>
             </div>
@@ -999,7 +941,7 @@ const Billing = () => {
 
       {/* Camera Scanner Modal */}
       {showScanner && (
-        <CameraScanner 
+        <CameraScanner
           onClose={() => setShowScanner(false)}
           onScanSuccess={(decodedText) => {
             const match = products.find(p => p.barcode && p.barcode === decodedText);
@@ -1087,9 +1029,8 @@ const Billing = () => {
               </div>
 
               {licenseMsg.text && (
-                <div className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${
-                  licenseMsg.type === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
-                }`}>
+                <div className={`p-2.5 rounded-xl text-xs flex items-center gap-2 ${licenseMsg.type === 'success' ? 'bg-emerald-500/10 text-emerald-600' : 'bg-rose-500/10 text-rose-600'
+                  }`}>
                   {licenseMsg.type === 'success' ? <CheckCircle className="h-4 w-4" /> : <AlertTriangle className="h-4 w-4" />}
                   <span>{licenseMsg.text}</span>
                 </div>

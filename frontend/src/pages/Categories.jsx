@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../context/AuthContext';
-import { Tags, Plus, Edit2, Trash2, X, Search, ChevronDown, ChevronRight } from 'lucide-react';
+import { Tags, Plus, Edit2, Trash2, X, Search, ChevronDown, ChevronRight, Loader2 } from 'lucide-react';
 
 const Categories = () => {
   const [categories, setCategories] = useState([]);
@@ -17,7 +17,9 @@ const Categories = () => {
   const [categoryDesc, setCategoryDesc] = useState('');
   const [subCategoriesInput, setSubCategoriesInput] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [expandedIds, setExpandedIds] = useState({});
+  const nameInputRef = useRef(null);
 
   const toggleRow = (id) => {
     setExpandedIds((prev) => ({
@@ -51,6 +53,9 @@ const Categories = () => {
     setSubCategoriesInput('');
     setError('');
     setShowModal(true);
+    setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 50);
   };
 
   const openEditModal = (cat) => {
@@ -60,17 +65,30 @@ const Categories = () => {
     setCategoryDesc(cat.description || '');
 
     // Find children and compile into comma-separated text
-    const childSubs = categories.filter(c => c.parent?._id === cat._id || c.parent === cat._id);
+    const childSubs = categories.filter(c => 
+      c.parent?._id === cat._id || 
+      c.parent === cat._id || 
+      (c.parent && c.parent.toString() === cat._id.toString())
+    );
     const subNames = childSubs.map(s => s.name).join(', ');
     setSubCategoriesInput(subNames);
 
     setError('');
     setShowModal(true);
+    setTimeout(() => {
+      nameInputRef.current?.focus();
+    }, 50);
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!categoryName.trim()) return;
+    if (e && e.preventDefault) e.preventDefault();
+    if (!categoryName.trim()) {
+      setError('Please enter a category name');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
 
     const subCategoriesArray = subCategoriesInput
       .split(',')
@@ -79,8 +97,8 @@ const Categories = () => {
 
     try {
       const payload = {
-        name: categoryName,
-        description: categoryDesc,
+        name: categoryName.trim(),
+        description: categoryDesc.trim(),
         subCategories: subCategoriesArray,
       };
 
@@ -88,17 +106,24 @@ const Categories = () => {
         const res = await api.post('/api/categories', payload);
         if (res.data.success) {
           setShowModal(false);
-          fetchCategories();
+          await fetchCategories();
+          alert('Category added successfully!');
         }
       } else {
         const res = await api.put(`/api/categories/${editId}`, payload);
         if (res.data.success) {
           setShowModal(false);
-          fetchCategories();
+          await fetchCategories();
+          alert('Category updated successfully!');
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save category');
+      console.error(err);
+      const msg = err.response?.data?.message || err.message || 'Failed to save category';
+      setError(msg);
+      alert('Error saving category: ' + msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -181,7 +206,11 @@ const Categories = () => {
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50 text-sm">
                 {filteredCategories.map((cat) => {
-                  const childSubs = categories.filter(c => c.parent?._id === cat._id || c.parent === cat._id);
+                  const childSubs = categories.filter(c => 
+                    c.parent?._id === cat._id || 
+                    c.parent === cat._id || 
+                    (c.parent && c.parent.toString() === cat._id.toString())
+                  );
                   const isExpanded = !!expandedIds[cat._id];
                   return (
                     <React.Fragment key={cat._id}>
@@ -242,7 +271,15 @@ const Categories = () => {
                                 <td className="py-2.5 px-6 text-slate-400 dark:text-slate-500 text-xs">
                                   —
                                 </td>
-                                <td className="py-2.5 px-6"></td>
+                                <td className="py-2.5 px-6 text-right" onClick={(e) => e.stopPropagation()}>
+                                  <button
+                                    onClick={() => handleDelete(sub._id)}
+                                    className="inline-flex p-1.5 text-slate-400 hover:text-red-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                                    title="Delete Subcategory"
+                                  >
+                                    <Trash2 className="h-3.5 w-3.5" />
+                                  </button>
+                                </td>
                               </tr>
                             );
                           })
@@ -265,13 +302,17 @@ const Categories = () => {
 
       {/* Create / Edit Modal Dialog */}
       {showModal && createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-40 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transition-colors duration-300">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
               <h3 className="font-bold text-slate-900 dark:text-white">
                 {modalMode === 'CREATE' ? 'Add New Category' : 'Edit Category'}
               </h3>
-              <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200">
+              <button
+                type="button"
+                onClick={() => setShowModal(false)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
                 <X className="h-5 w-5" />
               </button>
             </div>
@@ -284,12 +325,16 @@ const Categories = () => {
               )}
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
-                  Category Name
+                <label htmlFor="categoryNameInput" className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
+                  Category Name <span className="text-red-500">*</span>
                 </label>
                 <input
+                  id="categoryNameInput"
+                  ref={nameInputRef}
                   type="text"
                   required
+                  autoFocus
+                  autoComplete="off"
                   value={categoryName}
                   onChange={(e) => setCategoryName(e.target.value)}
                   placeholder="e.g. Electronics"
@@ -298,11 +343,13 @@ const Categories = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
+                <label htmlFor="subCategoriesInput" className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                   Subcategories (Comma separated - e.g. Mobile, Laptop, Tablet)
                 </label>
                 <input
+                  id="subCategoriesInput"
                   type="text"
+                  autoComplete="off"
                   value={subCategoriesInput}
                   onChange={(e) => setSubCategoriesInput(e.target.value)}
                   placeholder="e.g. Mobile, Laptop, Tablet"
@@ -311,10 +358,11 @@ const Categories = () => {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
+                <label htmlFor="categoryDescInput" className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                   Description
                 </label>
                 <textarea
+                  id="categoryDescInput"
                   value={categoryDesc}
                   onChange={(e) => setCategoryDesc(e.target.value)}
                   placeholder="Short explanation for categorization..."
@@ -326,6 +374,7 @@ const Categories = () => {
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setShowModal(false)}
                   className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
                 >
@@ -333,9 +382,11 @@ const Categories = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold"
                 >
-                  Save Changes
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Saving...' : 'Save Changes'}
                 </button>
               </div>
             </form>

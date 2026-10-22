@@ -19,4 +19,7 @@ router.route('/:id')
 router.route('/:id/users/:userId/password')
   .put(tenantController.resetAdminPassword);
 
+router.route('/:id/license')
+  .post(tenantController.generateTenantLicense);
+
 module.exports = router;

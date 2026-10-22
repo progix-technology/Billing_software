@@ -4,13 +4,15 @@ import { BrowserRouter, HashRouter, Routes, Route, Navigate } from 'react-router
 // Use HashRouter for Electron (file://), BrowserRouter for Web (http://)
 const isElectron = window.location.protocol === 'file:';
 const Router = isElectron ? HashRouter : BrowserRouter;
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, api } from './context/AuthContext';
 import { SettingsProvider } from './context/SettingsContext';
 import { ThemeProvider } from './context/ThemeContext';
 import AdminLayout from './components/Layout/AdminLayout';
 import SplashScreen from './components/Common/SplashScreen';
 
 // Pages
+import ActivateSoftware from './pages/ActivateSoftware';
+import InitialSetup from './pages/InitialSetup';
 import Login from './pages/Login';
 import ForgotPassword from './pages/ForgotPassword';
 import ResetPassword from './pages/ResetPassword';
@@ -32,8 +34,14 @@ import SuperAdminSettings from './pages/SuperAdminSettings';
 function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [fadeOut, setFadeOut] = useState(false);
+  const [systemState, setSystemState] = useState({
+    loading: true,
+    isActivated: false,
+    isSetupCompleted: false,
+  });
 
   useEffect(() => {
+    checkAppHealth();
     const fadeTimer = setTimeout(() => {
       setFadeOut(true);
     }, 2300);
@@ -48,6 +56,22 @@ function App() {
     };
   }, []);
 
+  const checkAppHealth = async () => {
+    try {
+      const res = await api.get('/api/system/setup-status');
+      if (res.data.success) {
+        setSystemState({
+          loading: false,
+          isActivated: res.data.isActivated,
+          isSetupCompleted: res.data.isSetupCompleted,
+        });
+      }
+    } catch (err) {
+      console.error('Setup status check failed', err);
+      setSystemState((prev) => ({ ...prev, loading: false }));
+    }
+  };
+
   return (
     <ThemeProvider>
       <AuthProvider>
@@ -55,8 +79,22 @@ function App() {
           {showSplash && <SplashScreen fadeOut={fadeOut} />}
           <Router>
             <Routes>
+              {/* Mandatory Activation & Initial Setup Routes */}
+              <Route path="/activate" element={<ActivateSoftware />} />
+              <Route path="/setup" element={<InitialSetup />} />
+
               {/* Public Auth Routes */}
-              <Route path="/login" element={<Login />} />
+              {/* Once activated, user can always access /login directly */}
+              <Route 
+                path="/login" 
+                element={
+                  !systemState.loading && !systemState.isActivated ? (
+                    <Navigate to="/activate" replace />
+                  ) : (
+                    <Login />
+                  )
+                } 
+              />
               <Route path="/forgot-password" element={<ForgotPassword />} />
               <Route path="/reset-password/:token" element={<ResetPassword />} />
 
@@ -81,9 +119,21 @@ function App() {
                 <Route path="/superadmin/settings" element={<SuperAdminSettings />} />
               </Route>
 
-              {/* Fallback Redirect */}
-              
-              <Route path="*" element={<Navigate to="/" replace />} />
+              {/* Global Root Fallback:
+                  1. If not activated -> Redirect to /activate
+                  2. If not setup -> Redirect to /setup
+                  3. If activated -> Redirect to /
+              */}
+              <Route 
+                path="*" 
+                element={
+                  !systemState.loading && !systemState.isActivated ? (
+                    <Navigate to="/activate" replace />
+                  ) : (
+                    <Navigate to="/login" replace />
+                  )
+                } 
+              />
             </Routes>
           </Router>
         </SettingsProvider>
@@ -93,4 +143,3 @@ function App() {
 }
 
 export default App;
-

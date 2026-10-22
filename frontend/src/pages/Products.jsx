@@ -5,7 +5,8 @@ import { api } from '../context/AuthContext';
 import { useAuth } from '../context/AuthContext';
 import { useSettings } from '../context/SettingsContext';
 import Barcode from 'react-barcode';
-import { Package, Plus, Edit2, Trash2, X, Search, AlertCircle, ArrowUpCircle, ChevronDown, Printer } from 'lucide-react';
+import { Package, Plus, Edit2, Trash2, X, Search, AlertCircle, ArrowUpCircle, ChevronDown, Printer, Loader2 } from 'lucide-react';
+import { printInvoiceElement } from '../utils/printHelper';
 
 const Products = () => {
   const { user } = useAuth();
@@ -55,6 +56,8 @@ const Products = () => {
   const [inwardRemarks, setInwardRemarks] = useState('');
 
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isStockSubmitting, setIsStockSubmitting] = useState(false);
   const [isFilterDropdownOpen, setIsFilterDropdownOpen] = useState(false);
   const [expandedFilterCats, setExpandedFilterCats] = useState({});
 
@@ -169,46 +172,36 @@ const Products = () => {
   };
 
   const triggerBarcodePrint = () => {
-    const printContent = `
-      <style>
-        @media print {
-          @page { margin: 0; }
-          body { 
-            display: flex; 
-            justify-content: center; 
-            align-items: flex-start; 
-            padding-top: 20px; 
-            -webkit-print-color-adjust: exact; 
-          }
-        }
-      </style>
-      <div style="display: flex; justify-content: center; width: 100%;">
-        ${printRef.current.outerHTML}
-      </div>
-    `;
-    const originalContent = document.body.innerHTML;
-    document.body.innerHTML = printContent;
-    window.print();
-    document.body.innerHTML = originalContent;
-    window.location.reload(); // Refresh to restore React bindings
+    if (!printRef.current) return;
+    printInvoiceElement(printRef, `Barcode-${printProduct?.name || 'Product'}`);
   };
 
   const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    if (!name.trim()) return;
+    if (e && e.preventDefault) e.preventDefault();
+    if (!name.trim()) {
+      alert('Please enter Product Name');
+      return;
+    }
+    if (!category) {
+      alert('Please select a Category for this product');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
 
     const payload = {
-      name,
+      name: name.trim(),
       sku: sku.trim() || undefined,
       barcode: barcode.trim() || undefined,
       category,
       subCategory: subCategory || null,
-      description,
-      purchasePrice: parseFloat(purchasePrice),
-      sellingPrice: parseFloat(sellingPrice),
-      gstPercentage: parseInt(gstPercentage),
-      stockQuantity: parseInt(stockQuantity),
-      minStockLevel: parseInt(minStockLevel),
+      description: description ? description.trim() : '',
+      purchasePrice: parseFloat(purchasePrice) || 0,
+      sellingPrice: parseFloat(sellingPrice) || 0,
+      gstPercentage: parseFloat(gstPercentage) || 0,
+      stockQuantity: parseInt(stockQuantity) || 0,
+      minStockLevel: parseInt(minStockLevel) || 5,
       image,
     };
 
@@ -217,34 +210,46 @@ const Products = () => {
         const res = await api.post('/api/products', payload);
         if (res.data.success) {
           setShowFormModal(false);
-          fetchProducts();
+          await fetchProducts();
+          alert('Product created successfully!');
         }
       } else {
         const res = await api.put(`/api/products/${editId}`, payload);
         if (res.data.success) {
           setShowFormModal(false);
-          fetchProducts();
+          await fetchProducts();
+          alert('Product details updated successfully!');
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save product details');
+      const msg = err.response?.data?.message || err.message || 'Failed to save product details';
+      setError(msg);
+      alert('Error: ' + msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   const handleStockSubmit = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+    setIsStockSubmitting(true);
     try {
       const res = await api.post(`/api/products/${stockProductId}/stock-in`, {
-        quantity: parseInt(inwardQuantity),
-        supplierPrice: parseFloat(inwardPrice),
-        remarks: inwardRemarks,
+        quantity: parseInt(inwardQuantity) || 0,
+        supplierPrice: parseFloat(inwardPrice) || 0,
+        remarks: inwardRemarks ? inwardRemarks.trim() : '',
       });
       if (res.data.success) {
         setShowStockModal(false);
-        fetchProducts();
+        await fetchProducts();
+        alert('Stock inward registered successfully!');
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to adjust stock level');
+      const msg = err.response?.data?.message || err.message || 'Failed to adjust stock level';
+      setError(msg);
+      alert('Error: ' + msg);
+    } finally {
+      setIsStockSubmitting(false);
     }
   };
 
@@ -590,7 +595,7 @@ const Products = () => {
 
       {/* Product Form Modal */}
       {showFormModal && createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm overflow-y-auto z-40 p-4 md:py-10 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm overflow-y-auto z-[9999] p-4 md:py-10 animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-2xl shadow-2xl overflow-hidden transition-colors duration-300 mx-auto my-4 md:my-8">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
               <h3 className="font-bold text-slate-900 dark:text-white">
@@ -610,32 +615,33 @@ const Products = () => {
 
               {/* Section 1: General Details */}
               <div className="space-y-4">
-                <h4 className="text-xs font-bold text-primary-600 uppercase tracking-wider border-b border-cream-200 pb-1.5">
+                <h4 className="text-xs font-bold text-primary-600 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   1. General Specifications
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Name */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
-                      Product Name
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
+                      Product Name *
                     </label>
                     <input
                       type="text"
                       required
+                      autoFocus
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="e.g. HP Laserjet Printer"
-                      className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 dark:text-white"
                     />
                   </div>
 
                   {/* Category */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
-                      Category
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
+                      Category *
                     </label>
                     {categories.length === 0 ? (
-                      <div className="p-2.5 border border-amber-500/20 bg-amber-50/50 rounded-xl text-xs text-amber-700 flex justify-between items-center">
+                      <div className="p-2.5 border border-amber-500/20 bg-amber-50/50 dark:bg-amber-950/20 rounded-xl text-xs text-amber-700 dark:text-amber-400 flex justify-between items-center">
                         <span>No categories.</span>
                         <Link to="/categories" className="text-primary-600 font-bold hover:underline">
                           Create Category &rarr;
@@ -646,7 +652,7 @@ const Products = () => {
                         value={category}
                         required
                         onChange={(e) => { setCategory(e.target.value); setSubCategory(''); }}
-                        className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2.5 px-3 focus:outline-none text-sm text-slate-900"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2.5 px-3 focus:outline-none text-sm text-slate-900 dark:text-white"
                       >
                         <option value="">Select Category</option>
                         {categories.filter(c => !c.parent).map((c) => (
@@ -658,14 +664,14 @@ const Products = () => {
 
                   {/* Subcategory */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                       Subcategory (Optional)
                     </label>
                     <select
                       value={subCategory}
                       onChange={(e) => setSubCategory(e.target.value)}
                       disabled={!category}
-                      className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2.5 px-3 focus:outline-none text-sm text-slate-900 disabled:opacity-50"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2.5 px-3 focus:outline-none text-sm text-slate-900 dark:text-white disabled:opacity-50"
                     >
                       <option value="">No Subcategory</option>
                       {categories
@@ -679,21 +685,21 @@ const Products = () => {
 
                 {/* Description */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
-                    Description / Details
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
+                    Description / Details (Text Area)
                   </label>
                   <textarea
-                    value={description}
+                    value={description || ''}
                     onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Describe packaging, dimensions, color variants, or specs..."
-                    rows={2}
-                    className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900"
+                    placeholder="Describe packaging, dimensions, color variants, specs..."
+                    rows={3}
+                    className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 dark:text-white"
                   />
                 </div>
 
                 {/* Product Image */}
                 <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
+                  <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                     Product Image (Optional upload)
                   </label>
                   <div className="flex items-center gap-3">
@@ -701,10 +707,10 @@ const Products = () => {
                       type="file"
                       accept="image/*"
                       onChange={handleImageChange}
-                      className="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary-50 file:text-primary-600 hover:file:bg-primary-100"
+                      className="text-xs text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-primary-50 dark:file:bg-slate-800 file:text-primary-600 hover:file:bg-primary-100"
                     />
                     {image && (
-                      <div className="h-10 w-10 rounded border border-cream-200 overflow-hidden flex-shrink-0">
+                      <div className="h-10 w-10 rounded border border-slate-200 dark:border-slate-800 overflow-hidden flex-shrink-0">
                         <img src={image} alt="Preview" className="h-full w-full object-cover" />
                       </div>
                     )}
@@ -714,13 +720,13 @@ const Products = () => {
 
               {/* Section 2: Pricing & GST */}
               <div className="space-y-4">
-                <h4 className="text-xs font-bold text-primary-600 uppercase tracking-wider border-b border-cream-200 pb-1.5">
+                <h4 className="text-xs font-bold text-primary-600 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   2. Pricing & Taxation (INR)
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   {/* Purchase Price */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                       Purchase Cost (₹)
                     </label>
                     <input
@@ -730,14 +736,14 @@ const Products = () => {
                       required
                       value={purchasePrice}
                       onChange={(e) => setPurchasePrice(e.target.value)}
-                      className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 font-semibold"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 dark:text-white font-semibold"
                     />
                   </div>
 
                   {/* Selling Price */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
-                      Selling Price (₹)
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
+                      Selling Price (₹) *
                     </label>
                     <input
                       type="number"
@@ -746,45 +752,63 @@ const Products = () => {
                       required
                       value={sellingPrice}
                       onChange={(e) => setSellingPrice(e.target.value)}
-                      className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 font-bold"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 dark:text-white font-bold"
                     />
                   </div>
 
                   {/* GST Percentage */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                       GST Rate (%)
                     </label>
-                    <select
-                      value={gstPercentage}
-                      onChange={(e) => setGstPercentage(parseInt(e.target.value))}
-                      className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2.5 px-3 focus:outline-none text-sm text-slate-900"
-                    >
-                      {settings?.gstSlabs?.map(slab => (
-                        <option key={slab} value={slab}>{slab}% Slab</option>
-                      )) || (
-                        <>
-                          <option value="0">0% Slab (Nil)</option>
-                          <option value="5">5% Slab</option>
-                          <option value="12">12% Slab</option>
-                          <option value="18">18% Slab</option>
-                          <option value="28">28% Slab</option>
-                        </>
-                      )}
-                    </select>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.5"
+                        required
+                        value={gstPercentage}
+                        onChange={(e) => setGstPercentage(parseFloat(e.target.value) || 0)}
+                        placeholder="e.g. 18"
+                        className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 dark:text-white font-bold"
+                      />
+                      <span className="text-sm font-bold text-slate-400">%</span>
+                    </div>
+
+                    {/* Quick slab buttons */}
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {(settings?.gstSlabs && settings.gstSlabs.length > 0
+                        ? settings.gstSlabs
+                        : [0, 5, 12, 18, 28]
+                      ).map((slab) => (
+                        <button
+                          key={slab}
+                          type="button"
+                          onClick={() => setGstPercentage(slab)}
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold transition-colors ${
+                            gstPercentage === slab
+                              ? 'bg-primary-600 text-white shadow-xs'
+                              : 'bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'
+                          }`}
+                        >
+                          {slab}%
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* Section 3: Stock Levels */}
               <div className="space-y-4">
-                <h4 className="text-xs font-bold text-primary-600 uppercase tracking-wider border-b border-cream-200 pb-1.5">
+                <h4 className="text-xs font-bold text-primary-600 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   3. Stock Levels & Thresholds
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* Stock Quantity */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                       {formMode === 'CREATE' ? 'Initial Stock Level (Qty)' : 'Adjusted Stock level'}
                     </label>
                     <input
@@ -793,13 +817,13 @@ const Products = () => {
                       required
                       value={stockQuantity}
                       onChange={(e) => setStockQuantity(e.target.value)}
-                      className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 font-bold text-primary-600"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 dark:text-white font-bold text-primary-600"
                     />
                   </div>
 
                   {/* Min Stock Level */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                       Low Stock Warning limit (Qty)
                     </label>
                     <input
@@ -808,7 +832,7 @@ const Products = () => {
                       required
                       value={minStockLevel}
                       onChange={(e) => setMinStockLevel(e.target.value)}
-                      className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 text-red-500"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 dark:text-white text-red-500 font-semibold"
                     />
                   </div>
                 </div>
@@ -816,13 +840,13 @@ const Products = () => {
 
               {/* Section 4: Identifiers */}
               <div className="space-y-4 pb-4">
-                <h4 className="text-xs font-bold text-primary-600 uppercase tracking-wider border-b border-cream-200 pb-1.5">
+                <h4 className="text-xs font-bold text-primary-600 uppercase tracking-wider border-b border-slate-100 dark:border-slate-800 pb-1.5">
                   4. Codes & Barcodes (Identifiers)
                 </h4>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   {/* SKU */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                       SKU Code (Auto generated if blank)
                     </label>
                     <input
@@ -830,13 +854,13 @@ const Products = () => {
                       value={sku}
                       onChange={(e) => setSku(e.target.value)}
                       placeholder="e.g. MONITOR-384"
-                      className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 font-mono"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 dark:text-white font-mono"
                     />
                   </div>
 
                   {/* Barcode */}
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 mb-1.5 uppercase">
+                    <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
                       Barcode string (Auto-generated if blank)
                     </label>
                     <input
@@ -844,26 +868,29 @@ const Products = () => {
                       value={barcode}
                       onChange={(e) => setBarcode(e.target.value)}
                       placeholder="e.g. 00000001 (Auto-generated)"
-                      className="w-full bg-cream-50/50 border border-cream-200 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 font-mono"
+                      className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 focus:border-primary-500 rounded-xl py-2 px-3 focus:outline-none text-sm text-slate-900 dark:text-white font-mono"
                     />
                   </div>
                 </div>
               </div>
 
               {/* Footer controls */}
-              <div className="flex justify-end gap-3 pt-4 border-t border-cream-200">
+              <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setShowFormModal(false)}
-                  className="px-4 py-2.5 border border-cream-200 rounded-xl text-slate-500 hover:bg-cream-200 hover:text-slate-700 transition-colors text-sm font-semibold"
+                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-sm font-semibold disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-5 py-2.5 bg-primary-600 hover:bg-primary-500 active:bg-primary-700 text-white rounded-xl shadow-lg shadow-primary-500/10 transition-all text-sm font-bold"
+                  disabled={isSubmitting}
+                  className="px-5 py-2.5 bg-primary-600 hover:bg-primary-500 active:bg-primary-700 text-white rounded-xl shadow-lg shadow-primary-500/10 transition-all text-sm font-bold flex items-center gap-2 disabled:opacity-50"
                 >
-                  Save Product
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <span>{isSubmitting ? 'Saving...' : 'Save Product'}</span>
                 </button>
               </div>
             </form>
@@ -874,7 +901,7 @@ const Products = () => {
 
       {/* Stock Inward Adjustment Modal */}
       {showStockModal && createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-40 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden transition-colors duration-300">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
               <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
@@ -908,7 +935,7 @@ const Products = () => {
                   required
                   value={inwardQuantity}
                   onChange={(e) => setInwardQuantity(e.target.value)}
-                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 focus:outline-none focus:border-primary-500 text-sm text-slate-900 dark:text-white"
+                  className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 focus:outline-none focus:border-primary-500 text-sm text-slate-900 dark:text-white font-bold"
                 />
               </div>
 
@@ -929,13 +956,13 @@ const Products = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
-                  Inward Remarks (e.g. Batch # or Supplier Invoice Ref)
+                  Inward Remarks / Reference (Text Area)
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={inwardRemarks}
                   onChange={(e) => setInwardRemarks(e.target.value)}
-                  placeholder="e.g. Purchased from Royal Distributors"
+                  placeholder="e.g. Purchased from Royal Distributors, Batch #992"
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 focus:outline-none focus:border-primary-500 text-sm text-slate-900 dark:text-white"
                 />
               </div>
@@ -943,16 +970,19 @@ const Products = () => {
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
+                  disabled={isStockSubmitting}
                   onClick={() => setShowStockModal(false)}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold"
+                  disabled={isStockSubmitting}
+                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
                 >
-                  Stock Inward
+                  {isStockSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <span>{isStockSubmitting ? 'Inwarding...' : 'Stock Inward'}</span>
                 </button>
               </div>
             </form>
@@ -960,9 +990,10 @@ const Products = () => {
         </div>,
         document.body
       )}
+
       {/* Print Barcode Modal */}
       {showPrintModal && printProduct && createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden transition-colors duration-300">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
               <h3 className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">

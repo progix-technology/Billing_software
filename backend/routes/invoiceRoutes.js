@@ -4,14 +4,11 @@ const {
   getInvoices,
   getInvoice,
   createInvoice,
-  getInvoicePDF,
 } = require('../controllers/invoiceController');
 const { protect } = require('../middleware/authMiddleware');
 const { checkLicense } = require('../middleware/licenseMiddleware');
 
 router.use(protect);
-
-router.get('/:id/pdf', getInvoicePDF);
 
 router
   .route('/')

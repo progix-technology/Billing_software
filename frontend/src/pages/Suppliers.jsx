@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../context/AuthContext';
-import { Truck, Plus, Edit2, Trash2, X, Search, FileSpreadsheet, Eye, IndianRupee } from 'lucide-react';
+import { Truck, Plus, Edit2, Trash2, X, Search, FileSpreadsheet, Eye, IndianRupee, Loader2 } from 'lucide-react';
 
 const Suppliers = () => {
   const [suppliers, setSuppliers] = useState([]);
@@ -36,6 +36,7 @@ const Suppliers = () => {
   const [outstandingBalance, setOutstandingBalance] = useState(0);
   
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const fetchSuppliers = async () => {
     setLoading(true);
@@ -105,17 +106,27 @@ const Suppliers = () => {
   };
 
   const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
+    if (e && e.preventDefault) e.preventDefault();
+    if (!name.trim()) {
+      alert('Please enter Supplier / Vendor Name');
+      return;
+    }
+    if (!phone.trim()) {
+      alert('Please enter Supplier Phone Number');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
 
     const payload = {
-      name,
-      contactPerson,
-      phone,
-      email,
-      gstNumber: gstNumber.toUpperCase(),
-      address,
-      outstandingBalance: parseFloat(outstandingBalance),
+      name: name.trim(),
+      contactPerson: contactPerson.trim(),
+      phone: phone.trim(),
+      email: email.trim(),
+      gstNumber: gstNumber.trim().toUpperCase(),
+      address: address.trim(),
+      outstandingBalance: parseFloat(outstandingBalance) || 0,
     };
 
     try {
@@ -123,17 +134,23 @@ const Suppliers = () => {
         const res = await api.post('/api/suppliers', payload);
         if (res.data.success) {
           setShowFormModal(false);
-          fetchSuppliers();
+          await fetchSuppliers();
+          alert('Supplier profile saved successfully!');
         }
       } else {
         const res = await api.put(`/api/suppliers/${editId}`, payload);
         if (res.data.success) {
           setShowFormModal(false);
-          fetchSuppliers();
+          await fetchSuppliers();
+          alert('Supplier profile updated successfully!');
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save supplier');
+      const msg = err.response?.data?.message || err.message || 'Failed to save supplier';
+      setError(msg);
+      alert('Error: ' + msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -318,7 +335,7 @@ const Suppliers = () => {
 
       {/* Supplier Form Modal */}
       {showFormModal && createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-40 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden transition-colors duration-300">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
               <h3 className="font-bold text-slate-900 dark:text-white">
@@ -424,13 +441,13 @@ const Suppliers = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
-                  Address
+                  Address (Text Area)
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  placeholder="Street details, Pin Code"
+                  placeholder="Street details, City, Pin Code"
                   className="w-full bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl py-2 px-3 focus:outline-none focus:border-primary-500 text-sm text-slate-900 dark:text-white"
                 />
               </div>
@@ -438,16 +455,19 @@ const Suppliers = () => {
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setShowFormModal(false)}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
+                  className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium disabled:opacity-50"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold"
+                  disabled={isSubmitting}
+                  className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold flex items-center gap-2 disabled:opacity-50"
                 >
-                  Save Profile
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  <span>{isSubmitting ? 'Saving...' : 'Save Profile'}</span>
                 </button>
               </div>
             </form>
@@ -458,7 +478,7 @@ const Suppliers = () => {
 
       {/* Ledger statement Modal */}
       {showLedgerModal && createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-40 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden transition-colors duration-300">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
               <div>

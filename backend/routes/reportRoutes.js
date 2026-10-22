@@ -5,6 +5,7 @@ const {
   getProfitLossReport,
   exportSalesExcel,
   exportStockExcel,
+  clearOldReports,
 } = require('../controllers/reportController');
 const { protect, authorize } = require('../middleware/authMiddleware');
 
@@ -14,5 +15,6 @@ router.get('/gst', getGstReport);
 router.get('/profit-loss', authorize('admin', 'manager'), getProfitLossReport);
 router.get('/sales/excel', authorize('admin', 'manager'), exportSalesExcel);
 router.get('/stock/excel', authorize('admin', 'manager'), exportStockExcel);
+router.delete('/clear-old', authorize('admin', 'manager'), clearOldReports);
 
 module.exports = router;

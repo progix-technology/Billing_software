@@ -1,12 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth, api } from '../../context/AuthContext';
 import Sidebar from './Sidebar';
 import Header from './Header';
+import ActivationModal from '../Common/ActivationModal';
 
 const AdminLayout = () => {
-  const { token, loading } = useAuth();
+  const { user, token, loading } = useAuth();
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+  const [licenseStatus, setLicenseStatus] = useState(null);
+
+  useEffect(() => {
+    if (token) {
+      checkLicense();
+    }
+  }, [token]);
+
+  const checkLicense = async () => {
+    try {
+      const res = await api.get('/api/license/status');
+      if (res.data.success) {
+        setLicenseStatus(res.data);
+      }
+    } catch (err) {
+      console.error('License check failed in AdminLayout', err);
+    }
+  };
 
   // If auth is loading, render skeleton splash screen
   if (loading) {
@@ -23,6 +42,12 @@ const AdminLayout = () => {
   // Redirect to login if not authenticated
   if (!token) {
     return <Navigate to="/login" replace />;
+  }
+
+  const isLicenseLocked = user?.role !== 'superadmin' && licenseStatus && (!licenseStatus.isActivated || licenseStatus.isExpired);
+
+  if (isLicenseLocked) {
+    return <Navigate to="/activate" replace />;
   }
 
   return (
@@ -47,6 +72,16 @@ const AdminLayout = () => {
           </div>
         </main>
       </div>
+
+      {/* Global License Lock Modal for Admin Panel */}
+      <ActivationModal
+        isOpen={Boolean(isLicenseLocked)}
+        onClose={() => {}}
+        isDismissible={false}
+        onActivated={(data) => {
+          setLicenseStatus(data);
+        }}
+      />
     </div>
   );
 };

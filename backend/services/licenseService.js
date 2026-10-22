@@ -21,13 +21,27 @@ function getMachineId() {
 
 // Generate License Key with cryptographic HMAC signature
 function generateLicenseKey(machineId, planName = 'Gold', durationDays = 365) {
-  const expiryDate = new Date();
-  expiryDate.setDate(expiryDate.getDate() + parseInt(durationDays));
+  let expStr;
+  let expiryDate;
 
-  // Format: YYYYMMDD
-  const expStr = expiryDate.toISOString().slice(0, 10).replace(/-/g, '');
+  if (
+    planName.toUpperCase().includes('LIFE') || 
+    planName.toUpperCase().includes('PERM') || 
+    parseInt(durationDays) >= 36500
+  ) {
+    // Permanent Lifetime - Year 9999 (Never Expires)
+    expStr = '99991231';
+    expiryDate = new Date(9999, 11, 31, 23, 59, 59);
+  } else {
+    expiryDate = new Date();
+    expiryDate.setDate(expiryDate.getDate() + parseInt(durationDays));
+    expStr = expiryDate.toISOString().slice(0, 10).replace(/-/g, '');
+  }
+
   const cleanPlan = planName.toUpperCase().slice(0, 4).padEnd(4, 'X');
-  const cleanMachine = machineId.replace(/[^A-Z0-9]/g, '').slice(-8);
+  const cleanMachine = (machineId === 'ANYPC' || machineId === 'ANYPC000') 
+    ? 'ANYPC000' 
+    : machineId.replace(/[^A-Z0-9]/g, '').slice(-8);
 
   const payload = `${cleanPlan}-${expStr}-${cleanMachine}`;
   const signature = crypto
@@ -66,18 +80,33 @@ function verifyLicenseKey(licenseKey, currentMachineId = getMachineId()) {
     }
 
     // Parse Expiry Date
-    const year = parseInt(expStr.slice(0, 4));
-    const month = parseInt(expStr.slice(4, 6)) - 1;
-    const day = parseInt(expStr.slice(6, 8));
-    const expiryDate = new Date(year, month, day, 23, 59, 59);
+    let expiryDate;
+    if (expStr === '99991231' || expStr.startsWith('9999')) {
+      expiryDate = new Date(9999, 11, 31, 23, 59, 59);
+    } else {
+      const year = parseInt(expStr.slice(0, 4));
+      const month = parseInt(expStr.slice(4, 6)) - 1;
+      const day = parseInt(expStr.slice(6, 8));
+      expiryDate = new Date(year, month, day, 23, 59, 59);
+    }
 
     if (new Date() > expiryDate) {
       return { valid: false, message: 'This license key has already expired.' };
     }
 
+    let cleanPlanName = 'Custom Plan';
+    if (expStr === '99991231' || plan.startsWith('LIFE') || plan.startsWith('PERM')) {
+      cleanPlanName = 'Permanent Lifetime (Never Expires)';
+    } else if (plan.startsWith('SILV')) cleanPlanName = 'Silver Monthly (30 Days)';
+    else if (plan.startsWith('STAN')) cleanPlanName = 'Standard (90 Days)';
+    else if (plan.startsWith('BUSI')) cleanPlanName = 'Business (180 Days)';
+    else if (plan.startsWith('GOLD')) cleanPlanName = 'Gold Annual (365 Days)';
+    else if (plan.startsWith('PLAT')) cleanPlanName = 'Platinum Lifetime (Permanent)';
+    else cleanPlanName = `${plan} Plan`;
+
     return {
       valid: true,
-      planName: plan === 'GOLD' ? 'Gold Annual' : plan === 'PLAT' ? 'Platinum Business' : `${plan} Plan`,
+      planName: cleanPlanName,
       expiryDate,
     };
   } catch (err) {
@@ -111,14 +140,18 @@ async function getLicenseStatus() {
   const expiresAt = new Date(license.expiresAt);
   const diffTime = expiresAt - now;
   const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  const isExpired = daysLeft <= 0;
+  const isPermanent = expiresAt.getFullYear() >= 9000;
+  const isExpired = isPermanent ? false : daysLeft <= 0;
+  const isActivated = Boolean(license && !isExpired && license.licenseKey && license.licenseKey !== 'TRIAL-ACTIVE');
 
   return {
+    isActivated,
     machineId,
     planName: license.planName,
-    isTrial: license.isTrial,
+    isTrial: Boolean(license.isTrial),
     expiresAt: license.expiresAt,
-    daysLeft: isExpired ? 0 : daysLeft,
+    daysLeft: isPermanent ? 'Lifetime Unlimited' : (isExpired ? 0 : daysLeft),
+    isPermanent,
     isExpired,
     licenseKey: license.licenseKey,
   };
@@ -149,6 +182,7 @@ async function activateLicenseKey(licenseKey) {
 
   return {
     success: true,
+    planName: verification.planName,
     message: `License activated successfully! Plan: ${verification.planName}`,
     expiresAt: verification.expiryDate,
   };

@@ -213,7 +213,7 @@ const SuperAdminPackages = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-slate-700 mb-1">Features (Comma separated)</label>
-                  <textarea name="features" rows="3" placeholder="e.g., 5 Users, Standard Support, No API Access" value={formData.features} onChange={handleInputChange} className="w-full bg-white border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
+                  <textarea name="features" rows="3" placeholder="e.g., 5 Users, Standard Support, No API Access" value={formData.features || ''} onChange={handleInputChange} className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"></textarea>
                 </div>
               </div>
 

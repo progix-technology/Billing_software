@@ -19,7 +19,7 @@ const protect = async (req, res, next) => {
         role: decoded.role,
         username: decoded.username,
         email: decoded.email,
-        tenantId: decoded.tenantId // Inject tenantId for multi-tenancy
+        tenantId: decoded.tenantId || (decoded.role === 'superadmin' ? '6aae231ec9df40fedcdd4170' : undefined) // Default tenant for superadmin store management
       };
 
       // Check Maintenance Mode for non-superadmins
@@ -49,6 +49,10 @@ const protect = async (req, res, next) => {
 // Role authorization check middleware
 const authorize = (...roles) => {
   return (req, res, next) => {
+    // SuperAdmin has unrestricted master access to all operations
+    if (req.user && req.user.role === 'superadmin') {
+      return next();
+    }
     if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({
         success: false,

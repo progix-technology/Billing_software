@@ -1,6 +1,7 @@
 const Tenant = require('../models/Tenant');
 const User = require('../models/User');
 const crypto = require('crypto');
+const { generateLicenseKey } = require('../services/licenseService');
 
 // @desc    Get all tenants
 // @route   GET /api/tenants
@@ -13,7 +14,8 @@ exports.getTenants = async (req, res, next) => {
     const tenantsWithUsers = await Promise.all(
       tenants.map(async (tenant) => {
         const users = await User.find({ tenantId: tenant._id, role: 'admin' }).select('-password');
-        return { ...tenant._doc, adminCount: users.length, users };
+        const baseDoc = tenant._doc || tenant;
+        return { ...baseDoc, adminCount: users.length, users };
       })
     );
 
@@ -41,7 +43,7 @@ exports.getTenant = async (req, res, next) => {
   }
 };
 
-// @desc    Create tenant and its admin user
+// @desc    Create tenant and its admin user with optional license key
 // @route   POST /api/tenants
 // @access  Private (Superadmin)
 exports.createTenant = async (req, res, next) => {
@@ -53,7 +55,9 @@ exports.createTenant = async (req, res, next) => {
       plan, 
       adminUsername, 
       adminEmail, 
-      adminPassword 
+      adminPassword,
+      machineId,
+      durationDays
     } = req.body;
 
     // Validate inputs
@@ -67,13 +71,15 @@ exports.createTenant = async (req, res, next) => {
       return res.status(400).json({ success: false, message: 'An admin with that email already exists' });
     }
 
-    // Determine expiry based on plan
-    const currentDate = new Date();
-    let validTill = new Date();
-    if (plan === 'premium') {
-      validTill.setFullYear(currentDate.getFullYear() + 1);
-    } else {
-      validTill.setMonth(currentDate.getMonth() + 1);
+    // Determine validity days & expiry
+    const days = parseInt(durationDays || (plan === 'premium' ? 365 : 30), 10);
+    const validTill = new Date();
+    validTill.setDate(validTill.getDate() + days);
+
+    // Generate cryptographic license key if machineId provided
+    let licenseKey = '';
+    if (machineId && machineId.trim()) {
+      licenseKey = generateLicenseKey(machineId.trim().toUpperCase(), plan || 'Gold', days);
     }
 
     // Create Tenant
@@ -81,9 +87,11 @@ exports.createTenant = async (req, res, next) => {
       businessName,
       contactEmail,
       contactPhone,
-      plan,
+      plan: plan || 'basic',
       validTill,
       status: 'active',
+      machineId: machineId ? machineId.trim().toUpperCase() : '',
+      licenseKey: licenseKey || '',
     });
 
     // Create Admin User for this Tenant
@@ -102,11 +110,55 @@ exports.createTenant = async (req, res, next) => {
         _id: adminUser._id,
         username: adminUser.username,
         email: adminUser.email,
-        role: adminUser.role
-      }
+        role: adminUser.role,
+        plainPassword: adminPassword // to show in instant copyable card
+      },
+      licenseKey: licenseKey || null,
+      validTill
     });
   } catch (error) {
     next(error);
+  }
+};
+
+// @desc    Generate or renew license key for a tenant
+// @route   POST /api/tenants/:id/license
+// @access  Private (Superadmin)
+exports.generateTenantLicense = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { machineId, plan, durationDays } = req.body;
+
+    if (!machineId) {
+      return res.status(400).json({ success: false, message: 'Client Machine Hardware ID is required' });
+    }
+
+    const tenant = await Tenant.findById(id);
+    if (!tenant) {
+      return res.status(404).json({ success: false, message: 'Tenant not found' });
+    }
+
+    const days = parseInt(durationDays || 365, 10);
+    const key = generateLicenseKey(machineId.trim().toUpperCase(), plan || tenant.plan || 'Gold', days);
+
+    const validTill = new Date();
+    validTill.setDate(validTill.getDate() + days);
+
+    tenant.machineId = machineId.trim().toUpperCase();
+    tenant.licenseKey = key;
+    tenant.validTill = validTill;
+    if (plan) tenant.plan = plan;
+    await tenant.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'License key successfully generated for tenant!',
+      licenseKey: key,
+      validTill,
+      tenant
+    });
+  } catch (err) {
+    next(err);
   }
 };
 

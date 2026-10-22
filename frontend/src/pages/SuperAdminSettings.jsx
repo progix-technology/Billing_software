@@ -127,7 +127,7 @@ const SuperAdminSettings = () => {
             <label className="block text-sm font-medium text-slate-700 mb-2">Maintenance Message (Displayed to users)</label>
             <textarea 
               rows="3" 
-              className="w-full bg-white border border-slate-300 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 text-slate-900 dark:text-white rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500 disabled:opacity-50"
               value={settings.maintenanceMessage}
               onChange={handleMessageChange}
               disabled={!settings.isMaintenanceMode}

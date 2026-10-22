@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { api } from '../context/AuthContext';
-import { Users, Plus, Edit2, Trash2, X, Search, FileSpreadsheet, Eye, IndianRupee } from 'lucide-react';
+import { Users, Plus, Edit2, Trash2, X, Search, FileSpreadsheet, Eye, IndianRupee, Loader2 } from 'lucide-react';
 
 const Customers = () => {
   const [customers, setCustomers] = useState([]);
@@ -14,6 +14,7 @@ const Customers = () => {
   const [showFormModal, setShowFormModal] = useState(false);
   const [formMode, setFormMode] = useState('CREATE'); // CREATE or EDIT
   const [editId, setEditId] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [showLedgerModal, setShowLedgerModal] = useState(false);
   const [ledgerCustomer, setLedgerCustomer] = useState(null);
@@ -105,17 +106,29 @@ const Customers = () => {
   };
 
   const handleFormSubmit = async (e) => {
-    e.preventDefault();
-    if (!name.trim() || !phone.trim()) return;
+    if (e && e.preventDefault) e.preventDefault();
+    if (!name.trim()) {
+      setError('Customer name is required');
+      alert('Please enter Customer Name');
+      return;
+    }
+    if (!phone.trim()) {
+      setError('Phone number is required');
+      alert('Please enter Customer Phone Number');
+      return;
+    }
+
+    setIsSubmitting(true);
+    setError('');
 
     const payload = {
-      name,
-      phone,
-      email,
-      gstNumber: gstNumber.toUpperCase(),
-      address,
-      notes,
-      outstandingBalance: parseFloat(outstandingBalance),
+      name: name.trim(),
+      phone: phone.trim(),
+      email: (email || '').trim(),
+      gstNumber: (gstNumber || '').trim().toUpperCase(),
+      address: (address || '').trim(),
+      notes: (notes || '').trim(),
+      outstandingBalance: parseFloat(outstandingBalance) || 0,
     };
 
     try {
@@ -123,17 +136,24 @@ const Customers = () => {
         const res = await api.post('/api/customers', payload);
         if (res.data.success) {
           setShowFormModal(false);
-          fetchCustomers();
+          await fetchCustomers();
+          alert('Customer registered successfully!');
         }
       } else {
         const res = await api.put(`/api/customers/${editId}`, payload);
         if (res.data.success) {
           setShowFormModal(false);
-          fetchCustomers();
+          await fetchCustomers();
+          alert('Customer details updated successfully!');
         }
       }
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to save customer');
+      console.error(err);
+      const msg = err.response?.data?.message || err.message || 'Failed to save customer';
+      setError(msg);
+      alert('Error saving customer: ' + msg);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -323,7 +343,7 @@ const Customers = () => {
 
       {/* Customer Form Modal */}
       {showFormModal && createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-40 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden transition-colors duration-300">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
               <h3 className="font-bold text-slate-900 dark:text-white">
@@ -344,11 +364,12 @@ const Customers = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
-                    Customer Name
+                    Customer Name <span className="text-red-500">*</span>
                   </label>
                   <input
                     type="text"
                     required
+                    autoFocus
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="e.g. Rajesh Kumar"
@@ -400,10 +421,10 @@ const Customers = () => {
 
               <div>
                 <label className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1.5 uppercase">
-                  Address
+                  Address (Text Area)
                 </label>
-                <input
-                  type="text"
+                <textarea
+                  rows={2}
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   placeholder="Street name, City, Pin Code"
@@ -443,6 +464,7 @@ const Customers = () => {
               <div className="flex justify-end gap-3 pt-3 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
+                  disabled={isSubmitting}
                   onClick={() => setShowFormModal(false)}
                   className="px-4 py-2 border border-slate-200 dark:border-slate-800 rounded-xl text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors text-sm font-medium"
                 >
@@ -450,9 +472,11 @@ const Customers = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-primary-600 hover:bg-primary-500 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold"
+                  disabled={isSubmitting}
+                  className="inline-flex items-center gap-2 px-5 py-2 bg-primary-600 hover:bg-primary-500 disabled:opacity-50 text-white rounded-xl shadow-lg transition-colors text-sm font-semibold"
                 >
-                  Save Profile
+                  {isSubmitting && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {isSubmitting ? 'Saving...' : 'Save Profile'}
                 </button>
               </div>
             </form>
@@ -463,7 +487,7 @@ const Customers = () => {
 
       {/* Ledger details Modal */}
       {showLedgerModal && createPortal(
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-40 animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 z-[9999] animate-fade-in">
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden transition-colors duration-300">
             <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex justify-between items-center bg-slate-50 dark:bg-slate-950/40">
               <div>

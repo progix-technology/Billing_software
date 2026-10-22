@@ -167,7 +167,7 @@ const Dashboard = () => {
           </div>
           <span className="text-[9px] font-semibold text-slate-500 mb-0.5">Gross Turnover</span>
           <p className="text-base font-bold text-slate-900 mb-0.5 leading-tight">
-            ₹{stats?.totalSales.toFixed(2)}
+            ₹{Number(stats?.totalSales || 0).toFixed(2)}
           </p>
           <Link to="/reports" className="mt-auto text-[9px] font-medium text-blue-600 flex items-center">
             View details <span className="ml-1">→</span>
@@ -185,7 +185,7 @@ const Dashboard = () => {
           </div>
           <span className="text-[9px] font-semibold text-slate-500 mb-0.5">Today's Sales</span>
           <p className="text-base font-bold text-slate-900 mb-0.5 leading-tight">
-            ₹{stats?.todaySales.toFixed(2)}
+            ₹{Number(stats?.todaySales || 0).toFixed(2)}
           </p>
           <Link to="/billing" className="mt-auto text-[9px] font-medium text-blue-600 flex items-center">
             View details <span className="ml-1">→</span>
@@ -203,7 +203,7 @@ const Dashboard = () => {
           </div>
           <span className="text-[9px] font-semibold text-slate-500 mb-0.5">Outstanding Dues</span>
           <p className="text-base font-bold text-slate-900 mb-0.5 leading-tight">
-            ₹{stats?.pendingPayments.toFixed(2)}
+            ₹{Number(stats?.pendingPayments || 0).toFixed(2)}
           </p>
           <Link to="/customers" className="mt-auto text-[9px] font-medium text-blue-600 flex items-center">
             View details <span className="ml-1">→</span>
@@ -219,7 +219,7 @@ const Dashboard = () => {
           </div>
           <span className="text-[9px] font-semibold text-slate-500 mb-0.5">Stock Alerts</span>
           <p className="text-base font-bold text-slate-900 mb-0.5 leading-tight">
-            {stats?.lowStockCount} Products
+            {stats?.lowStockCount ?? 0} Products
           </p>
           <Link to="/products" className="mt-auto text-[9px] font-medium text-blue-600 flex items-center">
             View products <span className="ml-1">→</span>
