@@ -84,11 +84,11 @@ function App() {
               <Route path="/setup" element={<InitialSetup />} />
 
               {/* Public Auth Routes */}
-              {/* Once activated, user can always access /login directly */}
+              {/* Once activated or on Web, user can always access /login directly */}
               <Route 
                 path="/login" 
                 element={
-                  !systemState.loading && !systemState.isActivated ? (
+                  !systemState.loading && !systemState.isActivated && isElectron ? (
                     <Navigate to="/activate" replace />
                   ) : (
                     <Login />
@@ -127,7 +127,7 @@ function App() {
               <Route 
                 path="*" 
                 element={
-                  !systemState.loading && !systemState.isActivated ? (
+                  !systemState.loading && !systemState.isActivated && isElectron ? (
                     <Navigate to="/activate" replace />
                   ) : (
                     <Navigate to="/login" replace />
