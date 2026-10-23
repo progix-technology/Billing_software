@@ -9,6 +9,7 @@ const {
   getCustomerLedger,
 } = require('../controllers/customerController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const { checkLicense } = require('../middleware/licenseMiddleware');
 
 router.use(protect);
 
@@ -17,12 +18,12 @@ router.get('/:id/ledger', getCustomerLedger);
 router
   .route('/')
   .get(getCustomers)
-  .post(createCustomer);
+  .post(checkLicense, createCustomer);
 
 router
   .route('/:id')
   .get(getCustomer)
-  .put(updateCustomer)
-  .delete(authorize('admin'), deleteCustomer);
+  .put(checkLicense, updateCustomer)
+  .delete(authorize('admin'), checkLicense, deleteCustomer);
 
 module.exports = router;

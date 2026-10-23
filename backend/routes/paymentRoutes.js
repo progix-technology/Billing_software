@@ -5,12 +5,13 @@ const {
   createPayment,
 } = require('../controllers/paymentController');
 const { protect } = require('../middleware/authMiddleware');
+const { checkLicense } = require('../middleware/licenseMiddleware');
 
 router.use(protect);
 
 router
   .route('/')
   .get(getPayments)
-  .post(createPayment);
+  .post(checkLicense, createPayment);
 
 module.exports = router;

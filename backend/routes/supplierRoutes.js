@@ -9,6 +9,7 @@ const {
   getSupplierLedger,
 } = require('../controllers/supplierController');
 const { protect, authorize } = require('../middleware/authMiddleware');
+const { checkLicense } = require('../middleware/licenseMiddleware');
 
 router.use(protect);
 
@@ -17,12 +18,12 @@ router.get('/:id/ledger', getSupplierLedger);
 router
   .route('/')
   .get(getSuppliers)
-  .post(authorize('admin', 'manager'), createSupplier);
+  .post(authorize('admin', 'manager'), checkLicense, createSupplier);
 
 router
   .route('/:id')
   .get(getSupplier)
-  .put(authorize('admin', 'manager'), updateSupplier)
-  .delete(authorize('admin', 'manager'), deleteSupplier);
+  .put(authorize('admin', 'manager'), checkLicense, updateSupplier)
+  .delete(authorize('admin', 'manager'), checkLicense, deleteSupplier);
 
 module.exports = router;
