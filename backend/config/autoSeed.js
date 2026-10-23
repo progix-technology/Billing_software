@@ -47,6 +47,24 @@ async function autoSeedOffline() {
         console.log('[AutoSeed] Default Admin created: progixtechnology@gmail.com / Progix@123');
       }
     }
+
+    // Always ensure SuperAdmin account exists with Password@123
+    const superAdmin = await userStore.findOneAsync({ email: 'superadmin@gmail.com' });
+    if (!superAdmin) {
+      const salt = await bcrypt.genSalt(10);
+      const hashedPassword = await bcrypt.hash('Password@123', salt);
+
+      await userStore.insertAsync({
+        username: 'SuperAdmin',
+        email: 'superadmin@gmail.com',
+        password: hashedPassword,
+        role: 'superadmin',
+        status: 'active',
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      console.log('[AutoSeed] SuperAdmin account created: superadmin@gmail.com / Password@123');
+    }
   } catch (err) {
     console.error('[AutoSeed Error]:', err.message);
   }

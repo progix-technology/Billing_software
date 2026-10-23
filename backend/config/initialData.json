@@ -38,6 +38,18 @@
       "updatedAt": "2026-09-19T05:52:30.416Z",
       "__v": 0,
       "tenantId": "6aae231ec9df40fedcdd4170"
+    },
+    {
+      "_id": "6aae1fff1490ad0da4c2808b",
+      "username": "SuperAdmin",
+      "email": "superadmin@gmail.com",
+      "password": "\\/3pTINLQ/dkJBzAY.2RYlUe7oEq5Jt4.SFM9KO9XelsjSAka",
+      "role": "superadmin",
+      "status": "active",
+      "profileImage": "",
+      "createdAt": "2026-10-23T08:14:22.192Z",
+      "updatedAt": "2026-10-23T08:14:22.194Z",
+      "__v": 0
     }
   ],
   "expenses": [],
