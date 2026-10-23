@@ -64,6 +64,18 @@ async function seedSuperAdminUser() {
       await admin.save();
       console.log('[SuperAdmin Cloud] Root SuperAdmin account initialized in MongoDB Atlas!');
     }
+
+    const progixAdmin = await SuperAdmin.findOne({ email: 'progixtechnology@gmail.com' });
+    if (!progixAdmin) {
+      const pAdmin = new SuperAdmin({
+        username: 'Progix Technology',
+        email: 'progixtechnology@gmail.com',
+        password: 'Progix@123',
+        role: 'superadmin'
+      });
+      await pAdmin.save();
+      console.log('[SuperAdmin Cloud] Progix Technology SuperAdmin initialized in Atlas!');
+    }
   } catch (err) {
     console.error('[SuperAdmin Cloud] Seed error:', err.message);
   }
