@@ -80,18 +80,33 @@ function App() {
           {showSplash && <SplashScreen fadeOut={fadeOut} />}
           <Router>
             <Routes>
-              {/* Mandatory Activation & Initial Setup Routes */}
-              <Route path="/activate" element={<ActivateSoftware />} />
-              <Route path="/setup" element={<InitialSetup />} />
+              {/* Mandatory Activation Route */}
+              <Route 
+                path="/activate" 
+                element={
+                  !systemState.loading && systemState.isActivated ? (
+                    <Navigate to="/login" replace />
+                  ) : (
+                    <ActivateSoftware refreshStatus={checkAppHealth} />
+                  )
+                } 
+              />
+              {/* Setup route redirects to login or activate - registration form disabled for clients */}
+              <Route 
+                path="/setup" 
+                element={
+                  <Navigate to={systemState.isActivated ? "/login" : "/activate"} replace />
+                } 
+              />
 
               {/* Public Auth Routes */}
               <Route 
                 path="/login" 
                 element={
-                  !systemState.loading && !systemState.isActivated && isElectron ? (
+                  systemState.loading ? (
+                    null
+                  ) : !systemState.isActivated ? (
                     <Navigate to="/activate" replace />
-                  ) : !systemState.loading && !systemState.isSetupCompleted && isElectron ? (
-                    <Navigate to="/setup" replace />
                   ) : (
                     <Login />
                   )
@@ -124,16 +139,15 @@ function App() {
 
               {/* Global Root Fallback:
                   1. If not activated -> Redirect to /activate
-                  2. If not setup -> Redirect to /setup
-                  3. If activated and setup -> Redirect to /login
+                  2. If activated -> Redirect to /login (or Dashboard if already authenticated)
               */}
               <Route 
                 path="*" 
                 element={
-                  !systemState.loading && !systemState.isActivated && isElectron ? (
+                  systemState.loading ? (
+                    null
+                  ) : !systemState.isActivated ? (
                     <Navigate to="/activate" replace />
-                  ) : !systemState.loading && !systemState.isSetupCompleted && isElectron ? (
-                    <Navigate to="/setup" replace />
                   ) : (
                     <Navigate to="/login" replace />
                   )

@@ -231,18 +231,15 @@ async function getLicenseStatus() {
   let license = await licenseStore.findOneAsync({ key: 'app_license' });
 
   if (!license) {
-    // Fresh install: Create 14-day Free Trial
-    const trialExpiry = new Date();
-    trialExpiry.setDate(trialExpiry.getDate() + 14);
-
+    // Fresh install: Software is locked until activated with key from SuperAdmin
     license = {
       key: 'app_license',
       machineId,
-      planName: '14-Day Free Trial',
-      isTrial: true,
-      activatedAt: new Date(),
-      expiresAt: trialExpiry,
-      licenseKey: 'TRIAL-ACTIVE',
+      planName: 'Activation Required',
+      isTrial: false,
+      activatedAt: null,
+      expiresAt: new Date(0),
+      licenseKey: '',
       lastSeenTime: Date.now(),
     };
     license.seal = generateStorageSeal(license);
@@ -318,26 +315,34 @@ async function getLicenseStatus() {
     ).catch(() => {});
   }
 
-  const expiresAt = new Date(license.expiresAt);
+  const expiresAt = new Date(license.expiresAt || 0);
   const diffTime = expiresAt - new Date(now);
   const daysLeft = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
   const isPermanent = expiresAt.getFullYear() >= 9000;
-  const isExpired = isPermanent ? false : daysLeft <= 0;
-  const isActivated = Boolean(license && !isExpired && license.licenseKey && license.licenseKey !== 'TRIAL-ACTIVE');
 
-  const safeDays = isPermanent ? 'Lifetime' : (isExpired ? 0 : daysLeft);
+  const hasRealKey = Boolean(
+    license.licenseKey && 
+    license.licenseKey !== 'TRIAL-ACTIVE' && 
+    license.licenseKey.trim().length > 0
+  );
+
+  const isExpired = isPermanent ? false : (!hasRealKey ? true : daysLeft <= 0);
+  const isActivated = Boolean(license && hasRealKey && !isExpired);
+
+  const safeDays = isPermanent ? 'Lifetime' : (isExpired ? 0 : Math.max(0, daysLeft));
+  const planDisplay = hasRealKey ? license.planName : 'Activation Required';
 
   return {
     isActivated,
     machineId,
-    planName: license.planName,
-    isTrial: Boolean(license.isTrial),
+    planName: planDisplay,
+    isTrial: false,
     expiresAt: license.expiresAt,
     daysLeft: safeDays,
     daysRemaining: safeDays,
     isPermanent,
     isExpired,
-    licenseKey: license.licenseKey,
+    licenseKey: license.licenseKey || '',
   };
 }
 

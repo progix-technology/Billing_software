@@ -312,12 +312,6 @@ const Login = () => {
             Helpline & Licensing: <span className="font-semibold text-slate-600">+91 89532 08952</span>
           </p>
           <p className="text-[11px] text-slate-400">
-            First time setup?{' '}
-            <Link to="/setup" className="font-semibold text-primary-600 hover:underline">
-              Configure Store & Admin Credentials
-            </Link>
-          </p>
-          <p className="text-[11px] text-slate-400">
             SuperAdmin Master Portal?{' '}
             <Link to="/superadmin/login" className="font-semibold text-indigo-600 hover:underline">
               Open SuperAdmin Login

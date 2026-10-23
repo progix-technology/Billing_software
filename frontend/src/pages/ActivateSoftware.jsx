@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Key, 
-  Copy, 
-  Check, 
-  PhoneCall, 
-  ShieldAlert, 
-  Sparkles, 
+import {
+  Key,
+  Copy,
+  Check,
+  PhoneCall,
+  ShieldAlert,
+  Sparkles,
   ExternalLink,
   Laptop,
   ArrowRight
@@ -15,7 +15,7 @@ import { api } from '../context/AuthContext';
 import logoImg from '../assets/progix_logo.png';
 import bgImg from '../assets/splash_screen_bg.png';
 
-const ActivateSoftware = () => {
+const ActivateSoftware = ({ refreshStatus }) => {
   const navigate = useNavigate();
   const [machineId, setMachineId] = useState('');
   const [licenseKey, setLicenseKey] = useState('');
@@ -82,8 +82,17 @@ const ActivateSoftware = () => {
           localStorage.setItem('prefill_admin_email', res.data.adminEmail);
         }
 
+        if (refreshStatus) {
+          refreshStatus();
+        }
+
         setTimeout(() => {
-          navigate('/login');
+          if (window.location.protocol === 'file:') {
+            window.location.hash = '#/login';
+            window.location.reload();
+          } else {
+            window.location.href = '/login';
+          }
         }, 1200);
       }
     } catch (err) {
@@ -226,11 +235,10 @@ const ActivateSoftware = () => {
 
             {/* Error or Success notification */}
             {message.text && (
-              <div className={`p-3.5 rounded-xl text-xs font-semibold ${
-                message.type === 'success' 
-                  ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 animate-fade-in' 
-                  : 'bg-red-50 text-red-700 border border-red-200 animate-fade-in'
-              }`}>
+              <div className={`p-3.5 rounded-xl text-xs font-semibold ${message.type === 'success'
+                ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 animate-fade-in'
+                : 'bg-red-50 text-red-700 border border-red-200 animate-fade-in'
+                }`}>
                 {message.text}
               </div>
             )}
