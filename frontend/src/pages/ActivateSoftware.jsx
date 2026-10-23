@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import {
   Key,
   Copy,
@@ -19,6 +19,7 @@ const ActivateSoftware = ({ refreshStatus }) => {
   const navigate = useNavigate();
   const [machineId, setMachineId] = useState('');
   const [licenseKey, setLicenseKey] = useState('');
+  const [licenseInfo, setLicenseInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [copiedId, setCopiedId] = useState(false);
@@ -33,9 +34,10 @@ const ActivateSoftware = ({ refreshStatus }) => {
       setFetching(true);
       const res = await api.get('/api/system/setup-status');
       if (res.data.success) {
-        setMachineId(res.data.license?.machineId || '');
-        // If already activated on this device, send directly to login
-        if (res.data.isActivated) {
+        setLicenseInfo(res.data);
+        setMachineId(res.data.license?.machineId || res.data.machineId || '');
+        // If already activated and not expired, send directly to login
+        if (res.data.isActivated && !res.data.isExpired) {
           navigate('/login');
         }
       }
@@ -142,16 +144,38 @@ const ActivateSoftware = ({ refreshStatus }) => {
         </div>
 
         <div className="p-7 space-y-5">
-          {/* Notice Banner */}
-          <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
-            <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
-            <div className="text-xs text-amber-900 leading-relaxed">
-              <p className="font-bold">Hardware Activation Required</p>
-              <p className="mt-0.5 text-amber-800">
-                This software is bound to this computer's unique hardware. Please enter your activation key to unlock and proceed to login.
-              </p>
+          {/* Dynamic Notice Banner */}
+          {licenseInfo?.license?.isClockTampered ? (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3">
+              <ShieldAlert className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-red-900 leading-relaxed">
+                <p className="font-bold">Security Alert: Clock Rollback Detected</p>
+                <p className="mt-0.5 text-red-800">
+                  System date tampering was detected. Please restore your computer's correct date and time to continue.
+                </p>
+              </div>
             </div>
-          </div>
+          ) : licenseInfo?.isExpired ? (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-3">
+              <ShieldAlert className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-red-900 leading-relaxed">
+                <p className="font-bold">Subscription Expired ({licenseInfo?.planName || 'Plan Ended'})</p>
+                <p className="mt-0.5 text-red-800">
+                  Aapka subscription period khatam ho chuka hai. Software ko aage use karne ke liye SuperAdmin se renewal key lein aur yahan enter karein.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex items-start gap-3">
+              <ShieldAlert className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
+              <div className="text-xs text-amber-900 leading-relaxed">
+                <p className="font-bold">Hardware Activation Required</p>
+                <p className="mt-0.5 text-amber-800">
+                  This software is bound to this computer's unique hardware. Please enter your activation key to unlock and proceed to login.
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Machine Hardware ID Box */}
           <div className="bg-slate-50 border border-slate-200 rounded-2xl p-4">
@@ -267,6 +291,15 @@ const ActivateSoftware = ({ refreshStatus }) => {
           </div>
         </div>
       </div>
+
+      {/* Discreet secret SuperAdmin portal button in bottom-right corner */}
+      <Link
+        to="/superadmin/login"
+        className="fixed bottom-3 right-3 p-2 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-300 z-50 cursor-pointer"
+        title="Master Portal"
+      >
+        <div className="w-2.5 h-2.5 rounded-full bg-slate-500 hover:bg-indigo-400 transition-colors shadow-sm" />
+      </Link>
     </div>
   );
 };

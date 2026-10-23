@@ -51,6 +51,9 @@ const Login = () => {
       const res = await api.get('/api/system/setup-status');
       if (res.data.success) {
         setLicenseStatus(res.data);
+        if (res.data.adminEmail) {
+          setEmailOrUsername((prev) => prev || res.data.adminEmail);
+        }
         const searchParams = new URLSearchParams(window.location.hash.split('?')[1] || window.location.search);
         const isSuperAdminMode = searchParams.get('mode') === 'superadmin';
         if (!res.data.isActivated && !isSuperAdminMode) {
@@ -307,18 +310,21 @@ const Login = () => {
           </div>
         </div>
 
-        <div className="text-center mt-4 space-y-1.5">
+        <div className="text-center mt-4">
           <p className="text-xs text-slate-400">
             Helpline & Licensing: <span className="font-semibold text-slate-600">+91 89532 08952</span>
           </p>
-          <p className="text-[11px] text-slate-400">
-            SuperAdmin Master Portal?{' '}
-            <Link to="/superadmin/login" className="font-semibold text-indigo-600 hover:underline">
-              Open SuperAdmin Login
-            </Link>
-          </p>
         </div>
       </div>
+
+      {/* Discreet secret SuperAdmin portal button in bottom-right corner */}
+      <Link
+        to="/superadmin/login"
+        className="fixed bottom-3 right-3 p-2 rounded-full opacity-0 hover:opacity-100 transition-opacity duration-300 z-50 cursor-pointer"
+        title="Master Portal"
+      >
+        <div className="w-2.5 h-2.5 rounded-full bg-slate-400 hover:bg-indigo-600 transition-colors shadow-sm" />
+      </Link>
 
       {/* Activation Modal */}
       <ActivationModal
