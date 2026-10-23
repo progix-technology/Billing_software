@@ -119,7 +119,7 @@ function verifyLicenseKey(licenseKey, currentMachineId = getMachineId()) {
 
     let cleanPlanName;
     if (isPermanent) {
-      cleanPlanName = `${basePlanName} (Lifetime)`;
+      cleanPlanName = basePlanName === 'Lifetime' ? 'Lifetime (Permanent)' : `${basePlanName} Lifetime`;
     } else {
       cleanPlanName = `${basePlanName} (${diffDays} Days)`;
     }

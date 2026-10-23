@@ -61,7 +61,7 @@ const Login = () => {
     setError('');
     setLoading(true);
 
-    const result = await login(emailOrUsername, password);
+    const result = await login(emailOrUsername.trim(), password.trim());
     setLoading(false);
 
     if (result.success) {
@@ -268,7 +268,7 @@ const Login = () => {
                 <p className="font-bold text-slate-800 leading-tight truncate">
                   {licenseStatus?.isActivated && !licenseStatus?.isExpired
                     ? (licenseStatus?.isPermanent || licenseStatus?.license?.isPermanent || licenseStatus?.daysRemaining === 'Lifetime' || licenseStatus?.daysLeft === 'Lifetime' || String(licenseStatus?.planName || '').includes('Lifetime')
-                        ? `${licenseStatus?.planName || licenseStatus?.license?.planName || 'Lifetime'} (Permanent)`
+                        ? (String(licenseStatus?.planName || '').includes('Permanent') ? (licenseStatus?.planName || 'Lifetime (Permanent)') : `${licenseStatus?.planName || 'Lifetime'} (Permanent)`)
                         : `${licenseStatus?.planName || licenseStatus?.license?.planName || 'Active'} (${licenseStatus?.daysRemaining ?? licenseStatus?.daysLeft ?? licenseStatus?.license?.daysLeft ?? 0}d left)`)
                     : 'Device Key Required'}
                 </p>

@@ -32,15 +32,20 @@ exports.signup = async (req, res, next) => {
 // @access  Public
 exports.login = async (req, res, next) => {
   try {
-    const { emailOrUsername, password } = req.body;
+    const rawIdentifier = (req.body.emailOrUsername || '').trim();
+    const password = (req.body.password || '').trim();
 
-    if (!emailOrUsername || !password) {
+    if (!rawIdentifier || !password) {
       return res.status(400).json({ success: false, message: 'Please provide email/username and password' });
     }
 
-    // Check for user
+    // Check for user (supports case-insensitive email or username)
     const user = await User.findOne({
-      $or: [{ email: emailOrUsername }, { username: emailOrUsername }],
+      $or: [
+        { email: rawIdentifier.toLowerCase() },
+        { email: rawIdentifier },
+        { username: rawIdentifier },
+      ],
     }).select('+password');
 
     if (!user) {
