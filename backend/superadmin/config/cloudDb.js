@@ -5,12 +5,11 @@ try {
   console.warn('[SuperAdmin Cloud DB] Mongoose module require note:', err.message);
 }
 
-const MONGO_URI = process.env.MONGO_URI || 
-  'mongodb+srv://progixtechnology_db_user:H7uh3siFqBmeqveH@cluster0.eb6dcjz.mongodb.net/billing-software?retryWrites=true&w=majority&appName=cluster0';
+const MONGO_URI = process.env.MONGO_URI;
 
 let cloudConnection;
 
-if (mongoose && typeof mongoose.createConnection === 'function') {
+if (MONGO_URI && mongoose && typeof mongoose.createConnection === 'function') {
   cloudConnection = mongoose.createConnection(MONGO_URI, {
     serverSelectionTimeoutMS: 5000,
     maxPoolSize: 10,
