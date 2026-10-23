@@ -29,41 +29,7 @@ async function autoSeedOffline() {
         }
       }
 
-      // Check if admin is now present after seeding
-      const checkAdmin = await userStore.findOneAsync({ role: 'admin' });
-      if (!checkAdmin) {
-        const salt = await bcrypt.genSalt(10);
-        const hashedPassword = await bcrypt.hash('Progix@123', salt);
-
-        await userStore.insertAsync({
-          username: 'Clothes Shop',
-          email: 'progixtechnology@gmail.com',
-          password: hashedPassword,
-          role: 'admin',
-          status: 'active',
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        });
-        console.log('[AutoSeed] Default Admin created: progixtechnology@gmail.com / Progix@123');
-      }
-    }
-
-    // Always ensure SuperAdmin account exists with Password@123
-    const superAdmin = await userStore.findOneAsync({ email: 'superadmin@gmail.com' });
-    if (!superAdmin) {
-      const salt = await bcrypt.genSalt(10);
-      const hashedPassword = await bcrypt.hash('Password@123', salt);
-
-      await userStore.insertAsync({
-        username: 'SuperAdmin',
-        email: 'superadmin@gmail.com',
-        password: hashedPassword,
-        role: 'superadmin',
-        status: 'active',
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      });
-      console.log('[AutoSeed] SuperAdmin account created: superadmin@gmail.com / Password@123');
+      // Do not create any default store admin. Stores are created via SuperAdmin Activation Keys.
     }
   } catch (err) {
     console.error('[AutoSeed Error]:', err.message);

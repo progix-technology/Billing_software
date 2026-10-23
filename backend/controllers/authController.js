@@ -98,6 +98,19 @@ exports.login = async (req, res, next) => {
 // @access  Private
 exports.getMe = async (req, res, next) => {
   try {
+    if (req.user && req.user.role === 'superadmin') {
+      return res.status(200).json({
+        success: true,
+        user: {
+          id: req.user.id,
+          username: req.user.username || 'SuperAdmin',
+          email: req.user.email || 'superadmin@gmail.com',
+          role: 'superadmin',
+          status: 'active'
+        }
+      });
+    }
+
     const user = await User.findById(req.user.id);
     if (!user) {
       return res.status(404).json({ success: false, message: 'User not found' });

@@ -1,7 +1,9 @@
 const Tenant = require('../models/Tenant');
 const User = require('../models/User');
 const crypto = require('crypto');
-const { generateLicenseKey } = require('../services/licenseService');
+const { generateLicenseKey, generateSmartLicenseKey } = require('../services/licenseService');
+const ClientAdmin = require('../superadmin/models/ClientAdmin');
+const LicenseKey = require('../superadmin/models/LicenseKey');
 
 // @desc    Get all tenants
 // @route   GET /api/tenants
@@ -19,7 +21,36 @@ exports.getTenants = async (req, res, next) => {
       })
     );
 
-    res.status(200).json({ success: true, count: tenants.length, tenants: tenantsWithUsers });
+    // Also fetch MongoDB Atlas clients to merge
+    try {
+      const atlasClients = await ClientAdmin.find().sort({ createdAt: -1 });
+      const atlasMapped = atlasClients.map(c => ({
+        _id: c._id.toString(),
+        businessName: c.storeName,
+        contactEmail: c.email,
+        contactPhone: c.phone,
+        plan: c.planName,
+        status: c.status,
+        machineId: c.machineId,
+        licenseKey: c.licenseKey,
+        validTill: c.validTill,
+        createdAt: c.createdAt,
+        adminCount: 1,
+        users: [{ username: c.ownerName || 'Admin', email: c.email, role: 'admin' }]
+      }));
+
+      // Combine without duplicating businessName / email
+      const existingEmails = new Set(tenantsWithUsers.map(t => (t.contactEmail || '').toLowerCase()));
+      for (const ac of atlasMapped) {
+        if (!existingEmails.has((ac.contactEmail || '').toLowerCase())) {
+          tenantsWithUsers.push(ac);
+        }
+      }
+    } catch (atlasErr) {
+      console.warn('[TenantController] Atlas merge note:', atlasErr.message);
+    }
+
+    res.status(200).json({ success: true, count: tenantsWithUsers.length, tenants: tenantsWithUsers });
   } catch (error) {
     next(error);
   }
@@ -76,11 +107,16 @@ exports.createTenant = async (req, res, next) => {
     const validTill = new Date();
     validTill.setDate(validTill.getDate() + days);
 
-    // Generate cryptographic license key if machineId provided
-    let licenseKey = '';
-    if (machineId && machineId.trim()) {
-      licenseKey = generateLicenseKey(machineId.trim().toUpperCase(), plan || 'Gold', days);
-    }
+    // Always generate Smart Self-Configuring Activation Key encoding credentials & duration
+    const licenseKey = generateSmartLicenseKey({
+      adminUsername,
+      adminEmail,
+      adminPassword,
+      storeName: businessName,
+      planName: plan || 'Gold',
+      durationDays: days,
+      machineId: machineId ? machineId.trim().toUpperCase() : 'ANYPC000',
+    });
 
     // Create Tenant
     const tenant = await Tenant.create({
@@ -102,6 +138,36 @@ exports.createTenant = async (req, res, next) => {
       password: adminPassword,
       role: 'admin'
     });
+
+    // Also persist directly into MongoDB Atlas cloud database
+    try {
+      await ClientAdmin.create({
+        storeName: businessName,
+        ownerName: adminUsername,
+        phone: contactPhone || '',
+        email: adminEmail,
+        machineId: machineId ? machineId.trim().toUpperCase() : 'ANYPC000',
+        planName: plan || 'Gold',
+        durationDays: days,
+        licenseKey: licenseKey || '',
+        validTill,
+        status: 'active'
+      });
+
+      if (licenseKey) {
+        await LicenseKey.create({
+          licenseKey,
+          machineId: machineId ? machineId.trim().toUpperCase() : 'ANYPC000',
+          planName: plan || 'Gold',
+          durationDays: days,
+          issuedTo: businessName,
+          expiryDate: validTill,
+          status: 'active'
+        });
+      }
+    } catch (atlasErr) {
+      console.warn('[TenantController] Atlas save note:', atlasErr.message);
+    }
 
     res.status(201).json({ 
       success: true, 
@@ -149,6 +215,25 @@ exports.generateTenantLicense = async (req, res, next) => {
     tenant.validTill = validTill;
     if (plan) tenant.plan = plan;
     await tenant.save();
+
+    // Also persist into MongoDB Atlas
+    try {
+      await LicenseKey.create({
+        licenseKey: key,
+        machineId: machineId.trim().toUpperCase(),
+        planName: plan || tenant.plan || 'Gold',
+        durationDays: days,
+        issuedTo: tenant.businessName || 'Tenant Renewal',
+        expiryDate: validTill,
+        status: 'active'
+      });
+      await ClientAdmin.findOneAndUpdate(
+        { email: tenant.contactEmail },
+        { licenseKey: key, validTill, machineId: machineId.trim().toUpperCase(), planName: plan || tenant.plan || 'Gold' }
+      );
+    } catch (atlasErr) {
+      console.warn('[TenantController] Atlas license update note:', atlasErr.message);
+    }
 
     res.status(200).json({
       success: true,

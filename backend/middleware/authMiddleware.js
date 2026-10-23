@@ -11,15 +11,21 @@ const protect = async (req, res, next) => {
   ) {
     try {
       token = req.headers.authorization.split(' ')[1];
-      const decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkeyforbillingsoftware12345');
+      let decoded;
+      try {
+        decoded = jwt.verify(token, process.env.JWT_SECRET || 'supersecretjwtkeyforbillingsoftware12345');
+      } catch (err1) {
+        const { SUPERADMIN_JWT_SECRET } = require('../superadmin/middleware/superAdminAuth');
+        decoded = jwt.verify(token, SUPERADMIN_JWT_SECRET);
+      }
 
       // Add user info from payload to request
       req.user = {
         id: decoded.id,
         role: decoded.role,
-        username: decoded.username,
+        username: decoded.username || (decoded.role === 'superadmin' ? 'SuperAdmin' : 'User'),
         email: decoded.email,
-        tenantId: decoded.tenantId || (decoded.role === 'superadmin' ? '6aae231ec9df40fedcdd4170' : undefined) // Default tenant for superadmin store management
+        tenantId: decoded.tenantId || (decoded.role === 'superadmin' ? 'superadmin_cloud_tenant' : undefined)
       };
 
       // Check Maintenance Mode for non-superadmins

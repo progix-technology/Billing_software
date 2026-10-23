@@ -30,6 +30,7 @@ import SuperAdminLayout from './components/Layout/SuperAdminLayout';
 import SuperAdminDashboard from './pages/SuperAdminDashboard';
 import SuperAdminPackages from './pages/SuperAdminPackages';
 import SuperAdminSettings from './pages/SuperAdminSettings';
+import SuperAdminLogin from './pages/SuperAdminLogin';
 
 function App() {
   const [showSplash, setShowSplash] = useState(true);
@@ -113,7 +114,8 @@ function App() {
                 <Route path="/profile" element={<Profile />} />
               </Route>
 
-              {/* Protected SuperAdmin Routes */}
+              {/* Dedicated SuperAdmin Routes (Separated from Store Login) */}
+              <Route path="/superadmin/login" element={<SuperAdminLogin />} />
               <Route element={<SuperAdminLayout />}>
                 <Route path="/superadmin" element={<SuperAdminDashboard />} />
                 <Route path="/superadmin/packages" element={<SuperAdminPackages />} />

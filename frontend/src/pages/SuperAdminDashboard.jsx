@@ -49,7 +49,11 @@ const SuperAdminDashboard = () => {
 
   // Quick Standalone License Key Generator
   const [isQuickGenOpen, setIsQuickGenOpen] = useState(false);
-  const [quickMachineId, setQuickMachineId] = useState('');
+  const [quickMachineId, setQuickMachineId] = useState('ANYPC000');
+  const [quickStoreName, setQuickStoreName] = useState('');
+  const [quickAdminEmail, setQuickAdminEmail] = useState('');
+  const [quickAdminPassword, setQuickAdminPassword] = useState('');
+  const [quickAdminUsername, setQuickAdminUsername] = useState('');
   const [quickPlan, setQuickPlan] = useState('Gold');
   const [quickDuration, setQuickDuration] = useState('365');
   const [quickLoading, setQuickLoading] = useState(false);
@@ -230,19 +234,25 @@ const SuperAdminDashboard = () => {
   // Quick Key Generator Handler
   const handleQuickGenerate = async (e) => {
     e.preventDefault();
-    if (!quickMachineId.trim()) {
-      alert('Please enter Client Machine Hardware ID');
-      return;
-    }
     setQuickLoading(true);
     try {
       const res = await api.post('/api/license/generate', {
-        machineId: quickMachineId.trim().toUpperCase(),
+        machineId: (quickMachineId || 'ANYPC000').trim().toUpperCase(),
         planName: quickPlan,
         durationDays: parseInt(quickDuration, 10),
+        storeName: quickStoreName || 'Client Store',
+        adminUsername: quickAdminUsername || 'Admin',
+        adminEmail: quickAdminEmail || 'admin@store.com',
+        adminPassword: quickAdminPassword || 'Admin@123'
       });
       if (res.data.success) {
-        setQuickResult(res.data);
+        setQuickResult({
+          ...res.data,
+          storeName: quickStoreName || 'Client Store',
+          adminEmail: quickAdminEmail || 'admin@store.com',
+          adminPassword: quickAdminPassword || 'Admin@123',
+          adminUsername: quickAdminUsername || 'Admin'
+        });
       }
     } catch (err) {
       alert(err.response?.data?.message || 'Failed to generate license key');
@@ -982,27 +992,66 @@ const SuperAdminDashboard = () => {
             </div>
 
             <div className="p-6 space-y-4">
-              <form onSubmit={handleQuickGenerate} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
-                    Client Machine Hardware ID *
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    placeholder="e.g. PRO-ABCD-1234-EFGH-5678"
-                    value={quickMachineId}
-                    onChange={(e) => setQuickMachineId(e.target.value.toUpperCase().trim())}
-                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
-                  />
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Client copies this ID from their software login screen or settings.
-                  </p>
+              <form onSubmit={handleQuickGenerate} className="space-y-3.5">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Store / Business Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Gupta Garments"
+                      value={quickStoreName}
+                      onChange={(e) => setQuickStoreName(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Admin Username
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Rohit"
+                      value={quickAdminUsername}
+                      onChange={(e) => setQuickAdminUsername(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Admin Login Email *
+                    </label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="admin@store.com"
+                      value={quickAdminEmail}
+                      onChange={(e) => setQuickAdminEmail(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                      Admin Login Password *
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Store@123"
+                      value={quickAdminPassword}
+                      onChange={(e) => setQuickAdminPassword(e.target.value)}
+                      className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
                       Subscription Plan
                     </label>
                     <select
@@ -1016,7 +1065,7 @@ const SuperAdminDashboard = () => {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
                       Validity Period
                     </label>
                     <select
@@ -1034,9 +1083,25 @@ const SuperAdminDashboard = () => {
                   </div>
                 </div>
 
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-700 mb-1">
+                    Client Machine Hardware ID (Optional)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="ANYPC000 (Allow Any Computer)"
+                    value={quickMachineId}
+                    onChange={(e) => setQuickMachineId(e.target.value.toUpperCase().trim())}
+                    className="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2 text-xs font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-amber-500"
+                  />
+                  <p className="text-[10px] text-slate-500 mt-0.5">
+                    Leave as ANYPC000 to allow activation on any client computer.
+                  </p>
+                </div>
+
                 <button
                   type="submit"
-                  disabled={quickLoading || !quickMachineId.trim()}
+                  disabled={quickLoading || !quickAdminEmail.trim() || !quickAdminPassword.trim()}
                   className="w-full bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold py-2.5 rounded-xl text-xs shadow-md transition-all flex items-center justify-center gap-2 disabled:opacity-50"
                 >
                   {quickLoading ? (
@@ -1044,7 +1109,7 @@ const SuperAdminDashboard = () => {
                   ) : (
                     <>
                       <Sparkles className="w-4 h-4" />
-                      <span>Generate Activation Key</span>
+                      <span>Generate Smart Activation Key</span>
                     </>
                   )}
                 </button>
@@ -1052,52 +1117,64 @@ const SuperAdminDashboard = () => {
 
               {/* Generated Result */}
               {quickResult && (
-                <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3 animate-fade-in">
+                <div className="mt-4 p-4 bg-emerald-50 border border-emerald-200 rounded-2xl space-y-3 animate-fade-in text-xs">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-bold text-emerald-800 flex items-center gap-1.5">
+                    <span className="font-bold text-emerald-800 flex items-center gap-1.5">
                       <ShieldCheck className="w-4 h-4 text-emerald-600" />
-                      Activation Key Ready
+                      Smart Activation Key Ready!
                     </span>
                     <span className="text-[10px] bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-full font-bold">
                       {quickResult.planName} • {quickResult.durationDays} Days
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="text"
-                      readOnly
-                      value={quickResult.licenseKey}
-                      className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 select-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        navigator.clipboard.writeText(quickResult.licenseKey);
-                        setCopiedId('quick-key');
-                        setTimeout(() => setCopiedId(''), 2500);
-                      }}
-                      className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm shrink-0"
-                    >
-                      {copiedId === 'quick-key' ? (
-                        <>
-                          <Check className="w-3.5 h-3.5" />
-                          <span>Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3.5 h-3.5" />
-                          <span>Copy</span>
-                        </>
-                      )}
-                    </button>
+                  {/* Summary of credentials encoded in the key */}
+                  <div className="p-3 bg-white rounded-xl border border-emerald-100 space-y-1 text-[11px] text-slate-700">
+                    <p><strong>Store:</strong> {quickResult.storeName || 'Client Store'}</p>
+                    <p><strong>Admin Login:</strong> <span className="font-mono text-primary-600 font-bold">{quickResult.adminEmail}</span></p>
+                    <p><strong>Password:</strong> <span className="font-mono text-slate-800 font-bold">{quickResult.adminPassword}</span></p>
+                  </div>
+
+                  <div>
+                    <label className="block text-[10px] font-bold uppercase text-slate-500 mb-1">
+                      Activation Key (Paste on /activate screen):
+                    </label>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        readOnly
+                        value={quickResult.licenseKey}
+                        className="w-full bg-white border border-emerald-300 rounded-xl px-3 py-2 text-xs font-mono font-bold text-slate-900 select-all"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          navigator.clipboard.writeText(quickResult.licenseKey);
+                          setCopiedId('quick-key');
+                          setTimeout(() => setCopiedId(''), 2500);
+                        }}
+                        className="px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm shrink-0"
+                      >
+                        {copiedId === 'quick-key' ? (
+                          <>
+                            <Check className="w-3.5 h-3.5" />
+                            <span>Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="w-3.5 h-3.5" />
+                            <span>Copy</span>
+                          </>
+                        )}
+                      </button>
+                    </div>
                   </div>
 
                   {/* Share on WhatsApp Button */}
                   <button
                     type="button"
                     onClick={() => {
-                      const msg = `🎉 PRO Billing Software - License Key Activated!\n\nPlan: ${quickResult.planName}\nDuration: ${quickResult.durationDays} Days\nMachine ID: ${quickResult.machineId}\n\n🔑 Your Activation Key:\n${quickResult.licenseKey}\n\nTo activate, open PRO Billing Software, click "Activate Key" on the login screen, paste this key and click Activate.\n\nSupport Hotline: +91 89532 08952`;
+                      const msg = `🎉 PRO Billing Software - License Activated!\n\nStore: ${quickResult.storeName}\nPlan: ${quickResult.planName} (${quickResult.durationDays} Days)\n\n🔑 Your Activation Key:\n${quickResult.licenseKey}\n\n👤 Admin Login Details:\nEmail: ${quickResult.adminEmail}\nPassword: ${quickResult.adminPassword}\n\nHow to activate:\n1. Open PRO Billing Software on your PC.\n2. Paste the Activation Key and click Activate.\n3. Login with your Admin Email & Password.\n\nSupport Hotline: +91 89532 08952`;
                       navigator.clipboard.writeText(msg);
                       setCopiedId('quick-wa');
                       setTimeout(() => setCopiedId(''), 2500);

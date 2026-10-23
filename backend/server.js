@@ -48,6 +48,12 @@ app.use('/api/system', systemRoutes);
 app.use('/api/license', licenseRoutes);
 app.use('/api/backup', backupRoutes);
 
+// Dedicated SuperAdmin Cloud Routes (Powered by MongoDB Atlas with Rate Limiting)
+const superAdminRoutes = require('./superadmin/routes/superAdminRoutes');
+const { seedSuperAdminUser } = require('./superadmin/controllers/superAdminController');
+seedSuperAdminUser();
+app.use('/api/superadmin', superAdminRoutes);
+
 // Root endpoint for healthchecks
 app.get('/health', (req, res) => {
   res.status(200).json({ success: true, message: 'Server is running perfectly' });

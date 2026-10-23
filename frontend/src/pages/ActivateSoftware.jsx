@@ -70,26 +70,21 @@ const ActivateSoftware = () => {
 
       if (res.data.success) {
         const plan = res.data.planName || 'Active';
+        const days = res.data.durationDays || '365';
+        const msg = res.data.message || `🎉 ${plan} (${days} Days) Package Activated Successfully!`;
         setMessage({
           type: 'success',
-          text: `🎉 Software Successfully Activated! Plan: ${plan}`
+          text: msg
         });
 
-        // Key activated! Check if first-time store profile & admin credentials setup is completed
-        try {
-          const statusRes = await api.get('/api/system/setup-status');
-          setTimeout(() => {
-            if (statusRes.data.success && statusRes.data.isSetupCompleted) {
-              navigate('/login');
-            } else {
-              navigate('/setup');
-            }
-          }, 900);
-        } catch (e) {
-          setTimeout(() => {
-            navigate('/setup');
-          }, 900);
+        // If key auto-configured the admin, save email to prefill on login screen
+        if (res.data.adminEmail) {
+          localStorage.setItem('prefill_admin_email', res.data.adminEmail);
         }
+
+        setTimeout(() => {
+          navigate('/login');
+        }, 1200);
       }
     } catch (err) {
       setMessage({

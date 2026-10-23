@@ -1,57 +1,5 @@
 {
-  "users": [
-    {
-      "_id": "6a36566513dcca2521bec114",
-      "username": "Clothes Shop",
-      "email": "progixtechnology@gmail.com",
-      "password": "$2a$10$VSJi41.ebTJzHID9.1hz3OKFN3o4msx6e4tj1UmU27ku6.IPfeHOW",
-      "role": "admin",
-      "status": "active",
-      "profileImage": "",
-      "createdAt": "2026-06-20T08:59:17.240Z",
-      "updatedAt": "2026-09-29T11:30:07.586Z",
-      "__v": 0,
-      "tenantId": "6aae231ec9df40fedcdd4170"
-    },
-    {
-      "_id": "6a72fe52e20365b85f28bafb",
-      "username": "ClothesWala",
-      "email": "clothe@gmail.com",
-      "password": "$2a$10$ZAA3AfEldTh.2m/hMOfkZ.sduzyn5nq8a4bBqvr4J0EsRAU.b1oT2",
-      "role": "admin",
-      "status": "active",
-      "profileImage": "",
-      "createdAt": "2026-08-05T09:11:46.172Z",
-      "updatedAt": "2026-09-19T05:52:30.416Z",
-      "__v": 0,
-      "tenantId": "6aae231ec9df40fedcdd4170"
-    },
-    {
-      "_id": "6a802a7affb833490544ec5e",
-      "username": "Test",
-      "email": "tes@gmail.com",
-      "password": "$2a$10$X.93DLodSG/Bfb71jScDe.wjXQJptQB5csLJPJnmER5XOTYcGphou",
-      "role": "admin",
-      "status": "active",
-      "profileImage": "",
-      "createdAt": "2026-08-15T08:59:38.839Z",
-      "updatedAt": "2026-09-19T05:52:30.416Z",
-      "__v": 0,
-      "tenantId": "6aae231ec9df40fedcdd4170"
-    },
-    {
-      "_id": "6aae1fff1490ad0da4c2808b",
-      "username": "SuperAdmin",
-      "email": "superadmin@gmail.com",
-      "password": "\\/3pTINLQ/dkJBzAY.2RYlUe7oEq5Jt4.SFM9KO9XelsjSAka",
-      "role": "superadmin",
-      "status": "active",
-      "profileImage": "",
-      "createdAt": "2026-10-23T08:14:22.192Z",
-      "updatedAt": "2026-10-23T08:14:22.194Z",
-      "__v": 0
-    }
-  ],
+  "users": [],
   "expenses": [],
   "inventorylogs": [
     {

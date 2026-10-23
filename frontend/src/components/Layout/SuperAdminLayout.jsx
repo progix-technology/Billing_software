@@ -6,7 +6,16 @@ import { LogOut, LayoutDashboard, Settings } from 'lucide-react';
 const SuperAdminLayout = () => {
   const { user, loading, logout } = useAuth();
 
-  if (loading) {
+  // Fallback to locally persisted superadmin session
+  let saUser = null;
+  try {
+    const raw = localStorage.getItem('superadmin_user');
+    if (raw) saUser = JSON.parse(raw);
+  } catch (e) {}
+
+  const currentUser = user || saUser;
+
+  if (loading && !currentUser) {
     return (
       <div className="h-screen w-screen flex items-center justify-center bg-slate-50">
         <div className="animate-spin h-10 w-10 border-4 border-primary-500 border-t-transparent rounded-full" />
@@ -15,8 +24,8 @@ const SuperAdminLayout = () => {
   }
 
   // Ensure they are authenticated and have the 'superadmin' role
-  if (!user || user.role !== 'superadmin') {
-    return <Navigate to="/login" replace />;
+  if (!currentUser || currentUser.role !== 'superadmin') {
+    return <Navigate to="/superadmin/login" replace />;
   }
 
   return (

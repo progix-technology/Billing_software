@@ -12,19 +12,25 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const [emailOrUsername, setEmailOrUsername] = useState('');
+  const [emailOrUsername, setEmailOrUsername] = useState(() => localStorage.getItem('prefill_admin_email') || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [systemMaintenance, setSystemMaintenance] = useState({ active: false, message: '' });
   const [overrideMaintenance, setOverrideMaintenance] = useState(false);
+  const [justActivatedNotice, setJustActivatedNotice] = useState(() => Boolean(localStorage.getItem('prefill_admin_email')));
 
   // License state for Login screen
   const [licenseStatus, setLicenseStatus] = useState(null);
   const [isActivationOpen, setIsActivationOpen] = useState(false);
 
   useEffect(() => {
+    const prefilled = localStorage.getItem('prefill_admin_email');
+    if (prefilled) {
+      setEmailOrUsername(prefilled);
+      setJustActivatedNotice(true);
+    }
     checkSettings();
     checkLicense();
   }, []);
@@ -58,9 +64,12 @@ const Login = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setLoading(true);
+    if (emailOrUsername.trim().toLowerCase().includes('superadmin')) {
+      setError('SuperAdmin has a dedicated portal. Please use the SuperAdmin Master Login link below.');
+      return;
+    }
 
+    setLoading(true);
     const result = await login(emailOrUsername.trim(), password.trim());
     setLoading(false);
 
@@ -175,6 +184,16 @@ const Login = () => {
           <div className="mb-6 p-4 bg-orange-50 border border-orange-200 rounded-xl flex items-center gap-3 text-sm text-orange-700 animate-fade-in">
             <ShieldAlert className="h-5 w-5 flex-shrink-0" />
             <p><strong>Maintenance Mode Active.</strong> Only Superadmins can log in right now.</p>
+          </div>
+        )}
+
+        {justActivatedNotice && (
+          <div className="mb-5 p-3.5 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-xs text-emerald-800 animate-fade-in">
+            <ShieldCheck className="h-5 w-5 text-emerald-600 flex-shrink-0" />
+            <div>
+              <p className="font-bold">Software License Successfully Activated!</p>
+              <p className="text-emerald-700 text-[11px]">Enter your admin password below to access your dashboard.</p>
+            </div>
           </div>
         )}
 
@@ -296,6 +315,12 @@ const Login = () => {
             First time setup?{' '}
             <Link to="/setup" className="font-semibold text-primary-600 hover:underline">
               Configure Store & Admin Credentials
+            </Link>
+          </p>
+          <p className="text-[11px] text-slate-400">
+            SuperAdmin Master Portal?{' '}
+            <Link to="/superadmin/login" className="font-semibold text-indigo-600 hover:underline">
+              Open SuperAdmin Login
             </Link>
           </p>
         </div>

@@ -29,7 +29,45 @@ function getMachineId() {
   return `PRGX-${hash.slice(0, 4)}-${hash.slice(4, 8)}-${hash.slice(8, 12)}`;
 }
 
-// Generate License Key with cryptographic HMAC signature
+// Generate Smart Self-Configuring License Key (Encodes user credentials, plan & duration)
+function generateSmartLicenseKey(params = {}) {
+  const {
+    adminUsername = 'Admin',
+    adminEmail = 'admin@store.com',
+    adminPassword = 'Admin@123',
+    storeName = 'PRO Store',
+    planName = 'Gold',
+    durationDays = 365,
+    machineId = 'ANYPC000',
+  } = params;
+
+  const cleanDays = parseInt(durationDays || 365, 10);
+  const cleanPlan = (planName || 'Gold').trim();
+  const cleanMachine = (machineId === 'ANYPC' || machineId === 'ANYPC000' || !machineId)
+    ? 'ANYPC000'
+    : machineId.replace(/[^A-Z0-9]/g, '').slice(-8);
+
+  const payload = {
+    u: (adminUsername || 'Admin').trim(),
+    e: (adminEmail || 'admin@store.com').trim().toLowerCase(),
+    p: (adminPassword || 'Admin@123').trim(),
+    s: (storeName || 'PRO Store').trim(),
+    plan: cleanPlan,
+    days: cleanDays,
+    m: cleanMachine,
+    ts: Date.now(),
+  };
+
+  const secret = crypto.createHash('sha256').update(LICENSE_SECRET).digest();
+  const iv = crypto.randomBytes(16);
+  const cipher = crypto.createCipheriv('aes-256-cbc', secret, iv);
+  const jsonStr = JSON.stringify(payload);
+  const enc = cipher.update(jsonStr, 'utf8', 'hex') + cipher.final('hex');
+
+  return 'PRGX-KEY-' + iv.toString('hex').toUpperCase() + enc.toUpperCase();
+}
+
+// Generate License Key with cryptographic HMAC signature (Legacy or Standard)
 function generateLicenseKey(machineId, planName = 'Gold', durationDays = 365) {
   let expStr;
   let expiryDate;
@@ -64,10 +102,61 @@ function generateLicenseKey(machineId, planName = 'Gold', durationDays = 365) {
   return `${payload}-${signature}`;
 }
 
-// Verify a License Key
-function verifyLicenseKey(licenseKey, currentMachineId = getMachineId()) {
+// Verify a License Key (Handles both Smart Self-Configuring keys and Legacy keys)
+function verifyLicenseKey(rawKey, currentMachineId = getMachineId()) {
   try {
-    const parts = licenseKey.trim().toUpperCase().split('-');
+    const key = (rawKey || '').trim();
+    if (!key) return { valid: false, message: 'Please provide a license key.' };
+
+    const cleanCurrentMachine = currentMachineId.replace(/[^A-Z0-9]/g, '').slice(-8);
+
+    // MODE 1: Smart Encrypted Key (PRGX-KEY-...)
+    if (key.toUpperCase().startsWith('PRGX-KEY-')) {
+      const hexStr = key.replace(/PRGX-KEY-/i, '').toLowerCase().trim();
+      if (hexStr.length < 64) {
+        return { valid: false, message: 'Invalid smart activation key length.' };
+      }
+
+      const iv = Buffer.from(hexStr.slice(0, 32), 'hex');
+      const ciphertext = hexStr.slice(32);
+      const secret = crypto.createHash('sha256').update(LICENSE_SECRET).digest();
+      const decipher = crypto.createDecipheriv('aes-256-cbc', secret, iv);
+      let decrypted;
+      try {
+        decrypted = decipher.update(ciphertext, 'hex', 'utf8') + decipher.final('utf8');
+      } catch (e) {
+        return { valid: false, message: 'Activation key decryption failed or key has been corrupted.' };
+      }
+
+      const payload = JSON.parse(decrypted);
+
+      // Verify machine hardware binding
+      if (payload.m && payload.m !== 'ANYPC000' && payload.m !== cleanCurrentMachine) {
+        return { valid: false, message: 'This activation key was generated for a different computer.' };
+      }
+
+      const isPermanent = parseInt(payload.days) >= 36500 || String(payload.plan).toUpperCase().includes('LIFE');
+      let expiryDate;
+      if (isPermanent) {
+        expiryDate = new Date(9999, 11, 31, 23, 59, 59);
+      } else {
+        expiryDate = new Date();
+        expiryDate.setDate(expiryDate.getDate() + parseInt(payload.days || 365));
+      }
+
+      return {
+        valid: true,
+        isSmartKey: true,
+        planName: `${payload.plan || 'Standard'} (${isPermanent ? 'Lifetime' : `${payload.days || 365} Days`})`,
+        basePlan: payload.plan || 'Standard',
+        durationDays: isPermanent ? 'Lifetime' : parseInt(payload.days || 365),
+        expiryDate,
+        payload,
+      };
+    }
+
+    // MODE 2: Legacy 4-Part Key (e.g. GOLD-20271023-ANYPC000-A1B2C3)
+    const parts = key.toUpperCase().split('-');
     if (parts.length !== 4) return { valid: false, message: 'Invalid license key format.' };
 
     const [plan, expStr, keyMachine, providedSig] = parts;
@@ -84,7 +173,6 @@ function verifyLicenseKey(licenseKey, currentMachineId = getMachineId()) {
     }
 
     // Verify machine match
-    const cleanCurrentMachine = currentMachineId.replace(/[^A-Z0-9]/g, '').slice(-8);
     if (keyMachine !== 'ANYPC000' && keyMachine !== cleanCurrentMachine) {
       return { valid: false, message: 'This license key was generated for a different computer.' };
     }
@@ -126,7 +214,10 @@ function verifyLicenseKey(licenseKey, currentMachineId = getMachineId()) {
 
     return {
       valid: true,
+      isSmartKey: false,
       planName: cleanPlanName,
+      basePlan: basePlanName,
+      durationDays: diffDays,
       expiryDate,
     };
   } catch (err) {
@@ -250,7 +341,7 @@ async function getLicenseStatus() {
   };
 }
 
-// Activate new license key with cryptographic seal & machine binding
+// Activate new license key with cryptographic seal, machine binding, & automatic user provisioning
 async function activateLicenseKey(licenseKey) {
   const machineId = getMachineId();
   const verification = verifyLicenseKey(licenseKey, machineId);
@@ -259,6 +350,8 @@ async function activateLicenseKey(licenseKey) {
     return { success: false, message: verification.message };
   }
 
+  const cleanKey = licenseKey.trim().toUpperCase();
+
   const licenseDoc = {
     key: 'app_license',
     machineId,
@@ -266,7 +359,7 @@ async function activateLicenseKey(licenseKey) {
     isTrial: false,
     activatedAt: new Date(),
     expiresAt: verification.expiryDate,
-    licenseKey: licenseKey.trim().toUpperCase(),
+    licenseKey: cleanKey,
     lastSeenTime: Date.now(),
   };
 
@@ -279,17 +372,109 @@ async function activateLicenseKey(licenseKey) {
     { upsert: true }
   );
 
+  let provisionedUser = null;
+
+  // Auto-configure Admin Account & Store Settings if Smart Key
+  if (verification.isSmartKey && verification.payload) {
+    try {
+      const User = require('../models/User');
+      const Tenant = require('../models/Tenant');
+      const StoreSetting = require('../models/StoreSetting');
+      const bcrypt = require('bcryptjs');
+
+      const { u, e, p, s, plan, days } = verification.payload;
+      const adminUsername = (u || 'Admin').trim();
+      const adminEmail = (e || 'admin@store.com').trim().toLowerCase();
+      const adminPassword = (p || 'Admin@123').trim();
+      const storeName = (s || 'PRO Store').trim();
+
+      // 1. Create or Update Tenant
+      let tenant = await Tenant.findOne({});
+      if (!tenant) {
+        tenant = await Tenant.create({
+          businessName: storeName,
+          contactEmail: adminEmail,
+          plan: plan || 'Gold',
+          validTill: verification.expiryDate,
+          status: 'active',
+          machineId: verification.payload.m || machineId,
+          licenseKey: cleanKey,
+        });
+      } else {
+        tenant.businessName = storeName;
+        tenant.contactEmail = adminEmail;
+        tenant.plan = plan || 'Gold';
+        tenant.validTill = verification.expiryDate;
+        tenant.licenseKey = cleanKey;
+        await tenant.save();
+      }
+
+      // 2. Create or Update Primary Admin User (Model.save handles bcrypt hashing)
+      let adminUser = await User.findOne({ email: adminEmail });
+
+      if (!adminUser) {
+        adminUser = await User.create({
+          tenantId: tenant._id,
+          username: adminUsername,
+          email: adminEmail,
+          password: adminPassword,
+          role: 'admin',
+        });
+      } else {
+        adminUser.username = adminUsername;
+        adminUser.password = adminPassword;
+        adminUser._isNewPassword = true;
+        adminUser.role = 'admin';
+        adminUser.tenantId = tenant._id;
+        await adminUser.save();
+      }
+
+      // 3. Mark store profile & setup as completed
+      let store = await StoreSetting.findOne({});
+      if (!store) {
+        store = await StoreSetting.create({
+          storeName: storeName,
+          ownerName: adminUsername,
+          email: adminEmail,
+          setupCompleted: true,
+          sampleDataSeeded: false,
+          isDemoMode: false,
+        });
+      } else {
+        store.storeName = storeName;
+        store.ownerName = adminUsername;
+        store.email = adminEmail;
+        store.setupCompleted = true;
+        await store.save();
+      }
+
+      provisionedUser = {
+        email: adminEmail,
+        username: adminUsername,
+      };
+      console.log(`[SmartKey Engine] Auto-provisioned Admin (${adminEmail}) for ${storeName} successfully!`);
+    } catch (provisionErr) {
+      console.error('[SmartKey Engine] Provisioning warning:', provisionErr.message);
+    }
+  }
+
   return {
     success: true,
-    planName: verification.planName,
-    message: `License activated successfully! Plan: ${verification.planName}`,
+    isSmartKey: Boolean(verification.isSmartKey),
+    planName: verification.basePlan || verification.planName,
+    durationDays: verification.durationDays,
+    message: `🎉 ${verification.planName} Activated Successfully!`,
     expiresAt: verification.expiryDate,
+    adminEmail: provisionedUser ? provisionedUser.email : null,
+    adminUsername: provisionedUser ? provisionedUser.username : null,
+    redirect: '/login',
   };
 }
 
 module.exports = {
   getMachineId,
   generateLicenseKey,
+  generateSmartLicenseKey,
   verifyLicenseKey,
   getLicenseStatus,
   activateLicenseKey,

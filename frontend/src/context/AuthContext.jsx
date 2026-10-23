@@ -62,6 +62,21 @@ export const AuthProvider = ({ children }) => {
   // Load user profile on startup if token exists
   useEffect(() => {
     const fetchUser = async () => {
+      // 1. Check if SuperAdmin session is stored
+      const saUserStr = localStorage.getItem('superadmin_user');
+      const saToken = localStorage.getItem('superadmin_token');
+      if (saToken && saUserStr) {
+        try {
+          const saUser = JSON.parse(saUserStr);
+          if (saUser && saUser.role === 'superadmin') {
+            setUser(saUser);
+            setLoading(false);
+            return;
+          }
+        } catch (e) {}
+      }
+
+      // 2. Regular user fetch
       if (token) {
         try {
           const res = await api.get('/api/auth/me');
@@ -125,7 +140,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, signup, logout, updateUser }}>
+    <AuthContext.Provider value={{ user, token, loading, login, signup, logout, updateUser, setUser, setToken }}>
       {children}
     </AuthContext.Provider>
   );
