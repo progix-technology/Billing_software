@@ -1,15 +1,4 @@
 {
-  "systemsettings": [
-    {
-      "_id": "6aae2e400a1f2cd3bee4248b",
-      "key": "global",
-      "isMaintenanceMode": false,
-      "maintenanceMessage": "System is under maintenance. Please try again later.",
-      "createdAt": "2026-09-19T06:40:00.979Z",
-      "updatedAt": "2026-09-19T06:47:04.224Z",
-      "__v": 0
-    }
-  ],
   "users": [
     {
       "_id": "6a36566513dcca2521bec114",
@@ -49,18 +38,6 @@
       "updatedAt": "2026-09-19T05:52:30.416Z",
       "__v": 0,
       "tenantId": "6aae231ec9df40fedcdd4170"
-    },
-    {
-      "_id": "6aae1fff1490ad0da4c2808b",
-      "username": "SuperAdmin",
-      "email": "superadmin@gmail.com",
-      "password": "$2a$10$BFsiU/3pTINLQ/dkJBzAY.2RYlUe7oEq5Jt4.SFM9KO9XelsjSAka",
-      "role": "superadmin",
-      "status": "active",
-      "profileImage": "",
-      "createdAt": "2026-09-19T05:39:11.162Z",
-      "updatedAt": "2026-09-29T11:37:26.415Z",
-      "__v": 0
     }
   ],
   "expenses": [],
@@ -1009,34 +986,6 @@
       "tenantId": "6aae231ec9df40fedcdd4170"
     }
   ],
-  "tenants": [
-    {
-      "_id": "6aae231ec9df40fedcdd4170",
-      "businessName": "Clothes Business",
-      "plan": "enterprise",
-      "status": "active",
-      "validTill": "2036-09-19T00:00:00.000Z",
-      "contactEmail": "admin@legacy.com",
-      "contactPhone": "+919999999999",
-      "address": "",
-      "createdAt": "2026-09-19T05:52:30.131Z",
-      "updatedAt": "2026-09-19T06:28:31.317Z",
-      "__v": 0
-    },
-    {
-      "_id": "6aae359da597a12921da089e",
-      "businessName": "Legacy Business",
-      "plan": "enterprise",
-      "status": "active",
-      "validTill": "2036-09-19T07:11:25.645Z",
-      "contactEmail": "admin@legacy.com",
-      "contactPhone": "0000000000",
-      "address": "",
-      "createdAt": "2026-09-19T07:11:25.660Z",
-      "updatedAt": "2026-09-19T07:11:25.660Z",
-      "__v": 0
-    }
-  ],
   "storesettings": [
     {
       "_id": "6a3665683dcf9f8b10fdce04",
@@ -1345,56 +1294,6 @@
       "updatedAt": "2026-09-19T05:52:30.956Z",
       "__v": 0,
       "tenantId": "6aae231ec9df40fedcdd4170"
-    }
-  ],
-  "packages": [
-    {
-      "_id": "6aae2c4ca802cb2b72aac85b",
-      "name": "basic",
-      "__v": 0,
-      "createdAt": "2026-09-19T06:31:40.173Z",
-      "durationMonths": 1,
-      "features": [
-        "Up to 5 Admins",
-        "Basic Reporting",
-        "Email Support"
-      ],
-      "isActive": true,
-      "maxAdmins": 1,
-      "price": 299,
-      "updatedAt": "2026-09-19T06:34:58.017Z"
-    },
-    {
-      "_id": "6aae2c4ca802cb2b72aac85c",
-      "name": "premium",
-      "__v": 0,
-      "createdAt": "2026-09-19T06:31:40.449Z",
-      "durationMonths": 12,
-      "features": [
-        "Up to 20 Admins",
-        "Advanced Reporting",
-        "Priority Support"
-      ],
-      "isActive": true,
-      "maxAdmins": 5,
-      "price": 2999,
-      "updatedAt": "2026-09-19T06:35:08.327Z"
-    },
-    {
-      "_id": "6aae2c4ca802cb2b72aac85d",
-      "name": "enterprise",
-      "__v": 0,
-      "createdAt": "2026-09-19T06:31:40.485Z",
-      "durationMonths": 12,
-      "features": [
-        "Unlimited Admins",
-        "Custom Features",
-        "24/7 Dedicated Support"
-      ],
-      "isActive": true,
-      "maxAdmins": 8,
-      "price": 4999,
-      "updatedAt": "2026-09-19T06:35:18.048Z"
     }
   ],
   "customers": [

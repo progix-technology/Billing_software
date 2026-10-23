@@ -267,13 +267,13 @@ const Login = () => {
               <div className="truncate max-w-[200px]">
                 <p className="font-bold text-slate-800 leading-tight truncate">
                   {licenseStatus?.isActivated && !licenseStatus?.isExpired
-                    ? (licenseStatus.isPermanent || licenseStatus.license?.isPermanent || licenseStatus.daysRemaining === 'Lifetime' || licenseStatus.daysLeft === 'Lifetime' || String(licenseStatus.planName || '').includes('Lifetime')
-                        ? `${licenseStatus.planName || licenseStatus.license?.planName || 'Lifetime'} (Permanent)`
-                        : `${licenseStatus.planName || licenseStatus.license?.planName || 'Active'} (${licenseStatus.daysRemaining ?? licenseStatus.daysLeft ?? licenseStatus.license?.daysLeft ?? 0}d left)`)
+                    ? (licenseStatus?.isPermanent || licenseStatus?.license?.isPermanent || licenseStatus?.daysRemaining === 'Lifetime' || licenseStatus?.daysLeft === 'Lifetime' || String(licenseStatus?.planName || '').includes('Lifetime')
+                        ? `${licenseStatus?.planName || licenseStatus?.license?.planName || 'Lifetime'} (Permanent)`
+                        : `${licenseStatus?.planName || licenseStatus?.license?.planName || 'Active'} (${licenseStatus?.daysRemaining ?? licenseStatus?.daysLeft ?? licenseStatus?.license?.daysLeft ?? 0}d left)`)
                     : 'Device Key Required'}
                 </p>
                 <p className="text-[10px] text-slate-500 font-mono truncate">
-                  ID: {licenseStatus?.machineId || licenseStatus.license?.machineId || 'Detecting...'}
+                  ID: {licenseStatus?.machineId || licenseStatus?.license?.machineId || 'Detecting...'}
                 </p>
               </div>
             </div>
