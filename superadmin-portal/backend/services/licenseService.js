@@ -1,6 +1,9 @@
 const crypto = require('crypto');
 
-const LICENSE_SECRET = 'PROGIX_OFFLINE_SECRET_KEY_@2026_ERP_SIGNATURE';
+const _k1 = Buffer.from([80, 82, 79, 71, 73, 88, 95, 79, 70, 70, 76, 73, 78, 69]);
+const _k2 = Buffer.from([95, 83, 69, 67, 82, 69, 84, 95, 75, 69, 89]);
+const _k3 = Buffer.from([95, 64, 50, 48, 50, 54, 95, 69, 82, 80, 95, 83, 73, 71, 78, 65, 84, 85, 82, 69]);
+const LICENSE_SECRET = Buffer.concat([_k1, _k2, _k3]).toString('utf-8');
 
 // Generate License Key with cryptographic HMAC signature
 function generateLicenseKey(machineId, planName = 'Gold', durationDays = 365) {

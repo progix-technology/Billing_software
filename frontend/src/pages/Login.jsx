@@ -264,14 +264,16 @@ const Login = () => {
               ) : (
                 <Key className="w-4 h-4 text-amber-600 flex-shrink-0" />
               )}
-              <div className="truncate max-w-[190px]">
-                <p className="font-bold text-slate-800 leading-tight">
+              <div className="truncate max-w-[200px]">
+                <p className="font-bold text-slate-800 leading-tight truncate">
                   {licenseStatus?.isActivated && !licenseStatus?.isExpired
-                    ? `${licenseStatus.planName || 'Active'} (${licenseStatus.daysRemaining}d left)`
+                    ? (licenseStatus.isPermanent || licenseStatus.license?.isPermanent || licenseStatus.daysRemaining === 'Lifetime' || licenseStatus.daysLeft === 'Lifetime' || String(licenseStatus.planName || '').includes('Lifetime')
+                        ? `${licenseStatus.planName || licenseStatus.license?.planName || 'Lifetime'} (Permanent)`
+                        : `${licenseStatus.planName || licenseStatus.license?.planName || 'Active'} (${licenseStatus.daysRemaining ?? licenseStatus.daysLeft ?? licenseStatus.license?.daysLeft ?? 0}d left)`)
                     : 'Device Key Required'}
                 </p>
                 <p className="text-[10px] text-slate-500 font-mono truncate">
-                  ID: {licenseStatus?.machineId || 'Detecting...'}
+                  ID: {licenseStatus?.machineId || licenseStatus.license?.machineId || 'Detecting...'}
                 </p>
               </div>
             </div>
