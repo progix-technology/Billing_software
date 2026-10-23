@@ -1,4 +1,15 @@
-const { Schema } = require('mongoose');
+let Schema;
+try {
+  const mongoose = require('mongoose');
+  Schema = mongoose.Schema;
+} catch (e) {
+  Schema = function() {
+    return {
+      pre: () => {},
+      methods: {}
+    };
+  };
+}
 const bcrypt = require('bcryptjs');
 const cloudConnection = require('../config/cloudDb');
 

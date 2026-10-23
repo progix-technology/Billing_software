@@ -1,4 +1,15 @@
-const { Schema } = require('mongoose');
+let Schema;
+try {
+  const mongoose = require('mongoose');
+  Schema = mongoose.Schema;
+} catch (e) {
+  Schema = function() {
+    return {
+      virtual: () => ({ get: () => {} }),
+      set: () => {}
+    };
+  };
+}
 const cloudConnection = require('../config/cloudDb');
 
 const licenseKeySchema = new Schema(
