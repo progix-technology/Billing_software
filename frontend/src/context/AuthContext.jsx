@@ -62,31 +62,42 @@ export const AuthProvider = ({ children }) => {
   // Load user profile on startup if token exists
   useEffect(() => {
     const fetchUser = async () => {
-      // 1. Check if SuperAdmin session is stored
-      const saUserStr = localStorage.getItem('superadmin_user');
-      const saToken = localStorage.getItem('superadmin_token');
-      if (saToken && saUserStr) {
-        try {
-          const saUser = JSON.parse(saUserStr);
-          if (saUser && saUser.role === 'superadmin') {
-            setUser(saUser);
-            setLoading(false);
-            return;
-          }
-        } catch (e) {}
+      const isSuperAdminRoute = 
+        window.location.pathname.startsWith('/superadmin') || 
+        window.location.hash.includes('superadmin');
+
+      // 1. Only restore SuperAdmin session if navigating inside /superadmin portal
+      if (isSuperAdminRoute) {
+        const saUserStr = localStorage.getItem('superadmin_user');
+        const saToken = localStorage.getItem('superadmin_token');
+        if (saToken && saUserStr) {
+          try {
+            const saUser = JSON.parse(saUserStr);
+            if (saUser && saUser.role === 'superadmin') {
+              setUser(saUser);
+              setLoading(false);
+              return;
+            }
+          } catch (e) {}
+        }
       }
 
-      // 2. Regular user fetch
-      if (token) {
+      // 2. Regular Store Admin user fetch
+      const currentToken = localStorage.getItem('token');
+      if (currentToken) {
         try {
           const res = await api.get('/api/auth/me');
-          if (res.data.success) {
+          if (res.data.success && res.data.user) {
             setUser(res.data.user);
+          } else {
+            logout();
           }
         } catch (err) {
           console.error('Auto login check failed', err);
           logout();
         }
+      } else {
+        setUser(null);
       }
       setLoading(false);
     };
@@ -96,6 +107,10 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (emailOrUsername, password) => {
     try {
+      // Clear any previous superadmin session to avoid session conflict
+      localStorage.removeItem('superadmin_user');
+      localStorage.removeItem('superadmin_token');
+
       const res = await api.post('/api/auth/login', { emailOrUsername, password });
       if (res.data.success) {
         localStorage.setItem('token', res.data.token);
@@ -131,6 +146,8 @@ export const AuthProvider = ({ children }) => {
 
   const logout = () => {
     localStorage.removeItem('token');
+    localStorage.removeItem('superadmin_user');
+    localStorage.removeItem('superadmin_token');
     setToken(null);
     setUser(null);
   };
