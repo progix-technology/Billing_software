@@ -75,10 +75,21 @@ const ActivateSoftware = () => {
           text: `🎉 Software Successfully Activated! Plan: ${plan}`
         });
 
-        // Key activated! Unlock software and proceed directly to Login screen
-        setTimeout(() => {
-          navigate('/login');
-        }, 800);
+        // Key activated! Check if first-time store profile & admin credentials setup is completed
+        try {
+          const statusRes = await api.get('/api/system/setup-status');
+          setTimeout(() => {
+            if (statusRes.data.success && statusRes.data.isSetupCompleted) {
+              navigate('/login');
+            } else {
+              navigate('/setup');
+            }
+          }, 900);
+        } catch (e) {
+          setTimeout(() => {
+            navigate('/setup');
+          }, 900);
+        }
       }
     } catch (err) {
       setMessage({

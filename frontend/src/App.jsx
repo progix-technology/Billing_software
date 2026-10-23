@@ -84,12 +84,13 @@ function App() {
               <Route path="/setup" element={<InitialSetup />} />
 
               {/* Public Auth Routes */}
-              {/* Once activated or on Web, user can always access /login directly */}
               <Route 
                 path="/login" 
                 element={
                   !systemState.loading && !systemState.isActivated && isElectron ? (
                     <Navigate to="/activate" replace />
+                  ) : !systemState.loading && !systemState.isSetupCompleted && isElectron ? (
+                    <Navigate to="/setup" replace />
                   ) : (
                     <Login />
                   )
@@ -122,13 +123,15 @@ function App() {
               {/* Global Root Fallback:
                   1. If not activated -> Redirect to /activate
                   2. If not setup -> Redirect to /setup
-                  3. If activated -> Redirect to /
+                  3. If activated and setup -> Redirect to /login
               */}
               <Route 
                 path="*" 
                 element={
                   !systemState.loading && !systemState.isActivated && isElectron ? (
                     <Navigate to="/activate" replace />
+                  ) : !systemState.loading && !systemState.isSetupCompleted && isElectron ? (
+                    <Navigate to="/setup" replace />
                   ) : (
                     <Navigate to="/login" replace />
                   )

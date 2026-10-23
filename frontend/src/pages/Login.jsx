@@ -288,9 +288,15 @@ const Login = () => {
           </div>
         </div>
 
-        <div className="text-center mt-4">
+        <div className="text-center mt-4 space-y-1.5">
           <p className="text-xs text-slate-400">
             Helpline & Licensing: <span className="font-semibold text-slate-600">+91 89532 08952</span>
+          </p>
+          <p className="text-[11px] text-slate-400">
+            First time setup?{' '}
+            <Link to="/setup" className="font-semibold text-primary-600 hover:underline">
+              Configure Store & Admin Credentials
+            </Link>
           </p>
         </div>
       </div>
