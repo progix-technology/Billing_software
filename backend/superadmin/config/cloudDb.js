@@ -31,7 +31,7 @@ if (MONGO_URI && mongoose && typeof mongoose.createConnection === 'function') {
       create: () => ({}),
       countDocuments: () => 0
     }),
-    on: () => {}
+    on: () => { }
   };
 }
 
